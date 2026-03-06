@@ -106,15 +106,9 @@ gh issue view "{issue_number}" --repo "{target_repo}" --json title,url
 ### 5. Display Success
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║              ✅ GITHUB ISSUE CREATED                       ║
-╠════════════════════════════════════════════════════════════╣
-║ Issue: #{issue_number}                                     ║
-║ URL: {issue_url}                                           ║
-║ Repo: {target_repo}                                        ║
-╚════════════════════════════════════════════════════════════╝
+Issue #{issue_number} created: {issue_url}
 
-Proceeding to launch Claude agent...
+Launching Claude agent...
 ```
 
 ---

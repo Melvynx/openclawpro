@@ -61,15 +61,13 @@ Extract from `$ARGUMENTS`:
 
 **If `{feature_name}` is empty:**
 ```
-❌ Feature name required.
+Feature name required.
 
-Usage:
-  /code-process <feature-name> [-ax|-ae]
+Usage: /code-process <feature-name> [-ax|-ae]
 
 Examples:
   /code-process add-dark-mode
   /code-process fix-login-bug -ae
-  /code-process refactor-auth -ax
 ```
 **STOP**
 
@@ -82,9 +80,7 @@ git rev-parse --show-toplevel
 
 **If fails:**
 ```
-❌ Not in a git repository.
-
-Navigate to a project directory first.
+Not in a git repository. Navigate to a project directory first.
 ```
 **STOP**
 
@@ -121,31 +117,25 @@ echo "Target repo: ${TARGET_REPO}"
 
 **If `{worktree_path}` already exists:**
 ```
-⚠️ Worktree already exists for: {feature_name}
-
+Worktree already exists: {feature_name}
 Path: {worktree_path}
-Branch: {branch_name}
 
 Options:
 1. Resume work in existing worktree
-2. Run cleanup first: /code-process cleanup {feature_name}
+2. Cleanup first: /code-process cleanup {feature_name}
 ```
 **STOP** - ask user how to proceed
 
 ### 7. Display Summary
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║                 🚀 CODE PROCESS: INIT                      ║
-╠════════════════════════════════════════════════════════════╣
-║ Feature: {feature_name}                                    ║
-║ Mode: {mode} ({examine|economy})                           ║
-║ Repo: {target_repo}                                        ║
-║ Branch: {branch_name}                                      ║
-║ Worktree: {worktree_path}                                  ║
-╚════════════════════════════════════════════════════════════╝
+Feature: {feature_name}
+Mode: {mode}
+Repo: {target_repo}
+Branch: {branch_name}
+Worktree: {worktree_path}
 
-Proceeding to create worktree...
+Creating worktree...
 ```
 
 ---

@@ -83,25 +83,15 @@ Check if code-task agent is still running.
 
    C) Send final report to main Telegram thread:
 
-      ✅ Code task FINISHED: {feature_name}
+      Code task FINISHED: {feature_name}
+      Repo: {target_repo}
+      Issue: {issue_url}
+      Branch: {branch_name}
 
-      📦 Repo: {target_repo}
-      📍 Worktree: {worktree_path}
-      🔗 Issue: {issue_url}
-      🔀 Branch: {branch_name}
+      Commits: [git log output, 1 line per commit]
+      PR: [gh pr list output or "No PR"]
 
-      Recent commits:
-      [git log output]
-
-      PR Status:
-      [gh pr list output]
-
-      Issue Status:
-      [gh issue view output]
-
-      Next steps:
-      - Review PR if created
-      - Run /code-process cleanup {feature_name} when merged
+      Cleanup when merged: /code-process cleanup {feature_name}
 ```
 
 ### 3. Create Cron Job
@@ -127,33 +117,16 @@ Use cron tool with action: "list" to verify job exists.
 ### 5. Display Final Summary
 
 ```
-╔════════════════════════════════════════════════════════════════════════════════╗
-║                      ✅ CODE PROCESS COMPLETE                                  ║
-╠════════════════════════════════════════════════════════════════════════════════╣
-║                                                                                ║
-║  🎯 Feature: {feature_name}                                                    ║
-║  📦 Repo: {target_repo}                                                        ║
-║  🔀 Branch: {branch_name}                                                      ║
-║  🔗 Issue: {issue_url}                                                         ║
-║  📍 Worktree: {worktree_path}                                                  ║
-║                                                                                ║
-╠════════════════════════════════════════════════════════════════════════════════╣
-║  🤖 Claude Agent: Running (PID: {claude_pid})                                  ║
-║  👁️ Watcher: Active (Job: {cron_job_id})                                       ║
-║                                                                                ║
-╠════════════════════════════════════════════════════════════════════════════════╣
-║  The agent is implementing your feature in the background.                     ║
-║  You will receive a Telegram notification when it completes.                   ║
-║                                                                                ║
-║  Commands while running:                                                       ║
-║  • Check status: ps -p {claude_pid}                                            ║
-║  • View worktree: cd {worktree_path} && git log --oneline                      ║
-║  • Stop agent: kill {claude_pid}                                               ║
-║                                                                                ║
-║  After PR is merged:                                                           ║
-║  • Cleanup: /code-process cleanup {feature_name}                               ║
-║                                                                                ║
-╚════════════════════════════════════════════════════════════════════════════════╝
+Code process complete.
+Feature: {feature_name}
+Repo: {target_repo}
+Branch: {branch_name}
+Issue: {issue_url}
+Agent PID: {claude_pid}
+Watcher Job: {cron_job_id}
+
+Telegram notification on completion.
+Cleanup: /code-process cleanup {feature_name}
 ```
 
 ---

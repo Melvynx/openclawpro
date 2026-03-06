@@ -45,13 +45,23 @@ Create a git worktree with a new branch and install all dependencies.
 cd "{target_repo_path}"
 ```
 
-### 2. Create Worktree Directory
+### 2. Pull Latest Changes (CRITICAL!)
+
+**Sync with remote before creating worktree:**
+```bash
+git fetch origin
+git pull origin main --ff-only
+```
+
+This ensures the worktree is based on the latest code, not stale/legacy code.
+
+### 3. Create Worktree Directory
 
 ```bash
 mkdir -p "{worktree_root}"
 ```
 
-### 3. Create Worktree with Branch
+### 4. Create Worktree with Branch
 
 **Create new branch and worktree:**
 ```bash
@@ -68,7 +78,7 @@ git worktree add "{worktree_path}" "{branch_name}"
 ls -la "{worktree_path}"
 ```
 
-### 4. Copy Environment Files
+### 5. Copy Environment Files
 
 **Copy all .env files to worktree:**
 ```bash
@@ -82,7 +92,7 @@ done
 ls -la "{worktree_path}"/.env* 2>/dev/null || echo "No .env files found"
 ```
 
-### 5. Install Dependencies
+### 6. Install Dependencies
 
 **Navigate to worktree:**
 ```bash
@@ -120,7 +130,7 @@ else
 fi
 ```
 
-### 6. Verify Setup
+### 7. Verify Setup
 
 **Check worktree is valid:**
 ```bash
@@ -133,19 +143,14 @@ git status
 git branch --show-current
 ```
 
-### 7. Display Success
+### 8. Display Success
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║              ✅ WORKTREE CREATED                           ║
-╠════════════════════════════════════════════════════════════╣
-║ Path: {worktree_path}                                      ║
-║ Branch: {branch_name}                                      ║
-║ Dependencies: Installed ✓                                  ║
-║ Env files: Copied ✓                                        ║
-╚════════════════════════════════════════════════════════════╝
+Worktree created at {worktree_path}
+Branch: {branch_name}
+Dependencies installed, env files copied.
 
-Proceeding to create GitHub issue...
+Creating GitHub issue...
 ```
 
 ---

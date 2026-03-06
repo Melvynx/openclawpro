@@ -108,13 +108,7 @@ gh pr list --repo "${TARGET_REPO}" --head "{branch_name}" --state merged --json 
 
 **If PR not merged:**
 ```
-⚠️ PR is not merged yet.
-
-Are you sure you want to cleanup? This will remove:
-- Worktree: {worktree_path}
-- Branch: {branch_name}
-
-Your work may be lost!
+PR not merged yet. Cleanup will remove worktree and branch. Work may be lost.
 ```
 
 ### 5. Remove Worktree
@@ -148,17 +142,8 @@ If found, use cron tool with action: "remove" and the jobId
 ### 9. Display Success
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║              ✅ CLEANUP COMPLETE                           ║
-╠════════════════════════════════════════════════════════════╣
-║ Feature: {feature_name}                                    ║
-║ Worktree: Removed ✓                                        ║
-║ Branch: Deleted ✓                                          ║
-║ Watcher: Cancelled ✓                                       ║
-╚════════════════════════════════════════════════════════════╝
-
-All traces of {feature_name} have been cleaned up.
-The feature has been merged into main.
+Cleanup complete: {feature_name}
+Worktree removed, branch deleted, watcher cancelled.
 ```
 
 ---

@@ -99,39 +99,23 @@ fi
 **Send message to main Telegram thread:**
 
 ```
-✅ Code task started: {feature_name}
-
-📦 Repo: {target_repo}
-📍 Working directory: {worktree_path}
-🔗 Issue: {issue_url}
-🔀 Branch: {branch_name}
-⚙️ Mode: {mode}
-
-Command launched:
-cd {worktree_path} && claude -p --dangerously-skip-permissions "{CLAUDE_PROMPT}"
-
+Code task started: {feature_name}
+Repo: {target_repo}
+Issue: {issue_url}
+Branch: {branch_name}
+Mode: {mode}
 PID: {claude_pid}
-
-Agent is now implementing the feature in background.
-Use /code-process status to check progress.
 ```
 
 ### 6. Display Success
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║              🚀 CLAUDE AGENT LAUNCHED                      ║
-╠════════════════════════════════════════════════════════════╣
-║ Feature: {feature_name}                                    ║
-║ Mode: {mode}                                               ║
-║ PID: {claude_pid}                                          ║
-║ Prompt: /apex {mode} -pr {issue_url}                       ║
-╠════════════════════════════════════════════════════════════╣
-║ Agent is running in background...                          ║
-║ Setting up watcher to monitor completion.                  ║
-╚════════════════════════════════════════════════════════════╝
+Agent launched (PID: {claude_pid})
+Feature: {feature_name}
+Mode: {mode}
+Prompt: /apex {mode} -pr {issue_url}
 
-Proceeding to setup watcher...
+Setting up watcher...
 ```
 
 ---
