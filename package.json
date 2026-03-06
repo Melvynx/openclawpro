@@ -1,0 +1,37 @@
+{
+  "name": "openclawpro",
+  "version": "0.1.0",
+  "description": "One-command setup for OpenClaw on a VPS",
+  "type": "module",
+  "bin": {
+    "openclawpro": "./bin/openclawpro.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "templates/"
+  ],
+  "keywords": [
+    "openclaw",
+    "vps",
+    "setup",
+    "gmail",
+    "webhook"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@inquirer/prompts": "^8.3.0",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "ora": "^9.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenClaw Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/openclaw gateway
+Environment=HOME=/root
+Environment=XDG_CONFIG_HOME=/root/.config
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
