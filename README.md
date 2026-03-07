@@ -58,7 +58,7 @@ ssh -L 18789:127.0.0.1:18789 root@YOUR_VPS_IP
 | `/root/.openclaw/` | OpenClaw config dir |
 | `/root/.openclaw/workspace/` | Agent workspace |
 | `/root/.openclaw/openclaw.json` | Main config |
-| `/root/.config/systemd/user/openclaw-gateway.service` | Systemd service |
+| `/etc/systemd/system/openclaw-gateway.service` | Systemd service |
 | `/usr/local/bin/claude-run` | Claude sandbox wrapper |
 
 ## Documentation

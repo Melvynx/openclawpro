@@ -171,22 +171,20 @@ This sets your gateway token, Telegram bot, channels, etc.
 
 ### Systemd service
 
-The setup script creates `/root/.config/systemd/user/openclaw-gateway.service`. To manage it:
+The setup script creates `/etc/systemd/system/openclaw-gateway.service`. To manage it:
 
 ```bash
-export XDG_RUNTIME_DIR="/run/user/0"
-
 # Enable auto-start
-systemctl --user enable openclaw-gateway
+systemctl enable openclaw-gateway
 
 # Start now
-systemctl --user start openclaw-gateway
+systemctl start openclaw-gateway
 
 # Check status
-systemctl --user status openclaw-gateway
+systemctl status openclaw-gateway
 
 # View logs
-journalctl --user -u openclaw-gateway -f
+journalctl -u openclaw-gateway -f
 ```
 
 ### claude-run wrapper
@@ -285,13 +283,13 @@ npx aiblueprint-cli openclaw pro setup
 
 ```bash
 # Gateway status
-systemctl --user status openclaw-gateway
+systemctl status openclaw-gateway
 
 # Live logs
-journalctl --user -u openclaw-gateway -f
+journalctl -u openclaw-gateway -f
 
 # Restart gateway
-systemctl --user restart openclaw-gateway
+systemctl restart openclaw-gateway
 
 # Check CloudFlared tunnel
 systemctl status cloudflared
@@ -305,7 +303,7 @@ openclaw doctor
 
 ```bash
 npm install -g openclaw
-systemctl --user restart openclaw-gateway
+systemctl restart openclaw-gateway
 ```
 
 ### Key file locations
@@ -315,6 +313,6 @@ systemctl --user restart openclaw-gateway
 | `/root/.openclaw/openclaw.json` | Main config |
 | `/root/.openclaw/workspace/` | Agent workspace |
 | `/root/.openclaw/gogcli/` | Gmail credentials |
-| `/root/.config/systemd/user/openclaw-gateway.service` | Systemd service |
+| `/etc/systemd/system/openclaw-gateway.service` | Systemd service |
 | `/etc/cloudflared/config.yml` | Tunnel config |
 | `/usr/local/bin/claude-run` | Claude sandbox wrapper |

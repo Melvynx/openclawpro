@@ -6,11 +6,11 @@ Common issues with the native OpenClaw setup.
 
 ## Gateway Won't Start
 
-**Symptom:** `systemctl --user status openclaw-gateway` shows failed.
+**Symptom:** `systemctl status openclaw-gateway` shows failed.
 
 **Check logs:**
 ```bash
-journalctl --user -u openclaw-gateway -n 50
+journalctl -u openclaw-gateway -n 50
 ```
 
 **Common causes:**
@@ -18,15 +18,13 @@ journalctl --user -u openclaw-gateway -n 50
 | Cause | Fix |
 |-------|-----|
 | OpenClaw not configured | Run `openclaw onboard` |
-| XDG_RUNTIME_DIR not set | Add `export XDG_RUNTIME_DIR="/run/user/0"` to ~/.bashrc |
 | openclaw.json missing | Check `/root/.openclaw/openclaw.json` exists |
 
 **Reset and restart:**
 ```bash
-export XDG_RUNTIME_DIR="/run/user/0"
-systemctl --user daemon-reload
-systemctl --user restart openclaw-gateway
-systemctl --user status openclaw-gateway
+systemctl daemon-reload
+systemctl restart openclaw-gateway
+systemctl status openclaw-gateway
 ```
 
 ---
@@ -41,7 +39,7 @@ Error: session file locked (timeout 10000ms): .../sessions/<id>.jsonl.lock
 **Fix:**
 ```bash
 rm -f /root/.openclaw/agents/main/sessions/*.lock
-systemctl --user restart openclaw-gateway
+systemctl restart openclaw-gateway
 ```
 
 ---
@@ -135,7 +133,7 @@ systemctl status cloudflared
 ss -tlnp | grep 8788
 
 # 3. Gateway has gmail logs?
-journalctl --user -u openclaw-gateway | grep -i gmail
+journalctl -u openclaw-gateway | grep -i gmail
 
 # 4. Gmail watch active?
 gog gmail watch status --account your.email@gmail.com
@@ -200,10 +198,10 @@ gcloud config set project YOUR_PROJECT_ID
 
 ```bash
 # Gateway status
-systemctl --user status openclaw-gateway
+systemctl status openclaw-gateway
 
 # Gateway logs (live)
-journalctl --user -u openclaw-gateway -f
+journalctl -u openclaw-gateway -f
 
 # OpenClaw version
 openclaw --version

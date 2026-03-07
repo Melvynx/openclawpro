@@ -1,4 +1,5 @@
 import { createServer, request } from "node:http";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { URL } from "node:url";
 
 const GATEWAY = "127.0.0.1";
@@ -131,7 +132,51 @@ createServer(async (req, res) => {
         }
       } else if (routeCfg.secretHeader) {
         const headerVal = req.headers[routeCfg.secretHeader.toLowerCase()];
-        if (headerVal !== routeCfg.secret) {
+        if (!headerVal) {
+          console.warn(`[${route}] missing header ${routeCfg.secretHeader}`);
+          return json(res, 401, { ok: false, error: "Invalid secret" });
+        }
+
+        let valid = false;
+        if (routeCfg.secretHeader.toLowerCase() === "stripe-signature") {
+          const parts = Object.fromEntries(
+            headerVal.split(",").map((p) => p.trim().split("=", 2))
+          );
+          if (parts.t && parts.v1) {
+            const tolerance = 300;
+            const age = Math.abs(Date.now() / 1000 - Number(parts.t));
+            if (age > tolerance) {
+              console.warn(`[${route}] stripe signature too old (${Math.round(age)}s)`);
+            } else {
+              const expected = createHmac("sha256", routeCfg.secret)
+                .update(`${parts.t}.${rawBody}`)
+                .digest("hex");
+              try {
+                valid = timingSafeEqual(Buffer.from(expected), Buffer.from(parts.v1));
+              } catch {
+                valid = false;
+              }
+            }
+          }
+        } else if (routeCfg.secretHeader.toLowerCase() === "x-hub-signature-256") {
+          const sig = headerVal.startsWith("sha256=") ? headerVal.slice(7) : headerVal;
+          const expected = createHmac("sha256", routeCfg.secret)
+            .update(rawBody)
+            .digest("hex");
+          try {
+            valid = timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
+          } catch {
+            valid = false;
+          }
+        } else {
+          try {
+            valid = timingSafeEqual(Buffer.from(headerVal), Buffer.from(routeCfg.secret));
+          } catch {
+            valid = false;
+          }
+        }
+
+        if (!valid) {
           console.warn(`[${route}] bad secret (header ${routeCfg.secretHeader})`);
           return json(res, 401, { ok: false, error: "Invalid secret" });
         }

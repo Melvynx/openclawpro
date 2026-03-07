@@ -2,7 +2,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { input, confirm, select, password } from '@inquirer/prompts';
 import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 
 import { run, runSafe, runInteractive, commandExists } from '../utils/exec.js';
@@ -73,11 +74,18 @@ async function getNextGmailPort(): Promise<number> {
   return port;
 }
 
-function buildGmailRunServiceContent(opts: GmailServiceOptions): string {
-  const { email, port, topic, subscription, pushToken, hookUrl, hookToken, gogKeyrungPassword } = opts;
-  const env = `HOME=/root XDG_CONFIG_HOME=/root/.config GOG_KEYRING_PASSWORD=${gogKeyrungPassword}`;
+async function buildGmailRunServiceContent(opts: GmailServiceOptions): Promise<string> {
+  const { email, port, topic, subscription, pushToken, hookUrl, hookToken, gogKeyringPassword } = opts;
 
-  return `[Unit]
+  const thisFile = fileURLToPath(import.meta.url);
+  const templatePath = join(dirname(thisFile), '..', '..', 'templates', 'gmail-service.template');
+
+  let template: string;
+  try {
+    template = await readFile(templatePath, 'utf8');
+  } catch {
+    const env = `HOME=/root XDG_CONFIG_HOME=/root/.config GOG_KEYRING_PASSWORD=${gogKeyringPassword}`;
+    return `[Unit]
 Description=Gmail Watch (${email})
 After=network-online.target
 Wants=network-online.target
@@ -91,6 +99,17 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 `;
+  }
+
+  return template
+    .replace(/\{\{EMAIL\}\}/g, email)
+    .replace(/\{\{PORT\}\}/g, String(port))
+    .replace(/\{\{TOPIC\}\}/g, topic)
+    .replace(/\{\{SUBSCRIPTION\}\}/g, subscription)
+    .replace(/\{\{PUSH_TOKEN\}\}/g, pushToken)
+    .replace(/\{\{HOOK_URL\}\}/g, hookUrl)
+    .replace(/\{\{HOOK_TOKEN\}\}/g, hookToken)
+    .replace(/\{\{GOG_KEYRING_PASSWORD\}\}/g, gogKeyringPassword);
 }
 
 // ─── Main Command ─────────────────────────────────────────────
@@ -205,102 +224,45 @@ export async function addGmail(options: AddGmailOptions): Promise<void> {
     credsFile = altCredsPath;
     console.log(chalk.green(`✓ Found credentials: ${altCredsPath}`));
   } else {
-    console.log(chalk.yellow('No OAuth credentials found. Attempting to create via gcloud...'));
-
-    let created = false;
-
-    try {
-      const brandsResult = await runSafe('gcloud', [
-        'alpha', 'iap', 'oauth-brands', 'list',
-        `--project=${projectId}`,
-        '--format=json',
-      ]);
-      const brands: Array<{ name: string }> = brandsResult?.stdout ? JSON.parse(brandsResult.stdout) : [];
-
-      if (brands.length === 0) {
-        const supportEmail = activeAccount || email;
-        await run('gcloud', [
-          'alpha', 'iap', 'oauth-brands', 'create',
-          `--application_title=OpenClaw Gmail`,
-          `--support_email=${supportEmail}`,
-          `--project=${projectId}`,
-        ]);
-      }
-
-      const brandsResult2 = await run('gcloud', [
-        'alpha', 'iap', 'oauth-brands', 'list',
-        `--project=${projectId}`,
-        '--format=json',
-      ]);
-      const brands2 = JSON.parse(brandsResult2.stdout) as Array<{ name: string }>;
-      if (brands2.length > 0) {
-        const brandName = brands2[0].name;
-        const clientResult = await run('gcloud', [
-          'alpha', 'iap', 'oauth-clients', 'create', brandName,
-          '--display_name=OpenClaw Gmail Client',
-          '--format=json',
-        ]);
-        const clientData = JSON.parse(clientResult.stdout) as { name: string; secret: string };
-        const oauthCreds = {
-          installed: {
-            client_id: clientData.name.split('/').pop(),
-            client_secret: clientData.secret,
-            auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-            token_uri: 'https://oauth2.googleapis.com/token',
-            redirect_uris: ['http://localhost'],
-          },
-        };
-        await mkdir(GOGCLI_DIR, { recursive: true });
-        await writeFile(credsPath, JSON.stringify(oauthCreds, null, 2), 'utf8');
-        credsFile = credsPath;
-        created = true;
-        console.log(chalk.green('✓ OAuth credentials created automatically'));
-      }
-    } catch {
-      // gcloud alpha approach failed - show manual instructions
-    }
-
-    if (!created) {
-      console.log('\n' + chalk.yellow.bold('⚠  Manual OAuth credentials setup required:'));
-      console.log(chalk.white(`
+    console.log('\n' + chalk.yellow.bold('Manual OAuth credentials setup required:'));
+    console.log(chalk.white(`
   1. Open this URL in your browser:
      ${chalk.cyan(`https://console.cloud.google.com/apis/credentials/oauthclient?project=${projectId}`)}
 
-  2. Click "Create Credentials" → "OAuth 2.0 Client ID"
+  2. Click "Create Credentials" -> "OAuth 2.0 Client ID"
   3. Application type: ${chalk.bold('Desktop App')}
   4. Name: ${chalk.bold('OpenClaw Gmail')}
-  5. Click "Create" → download the JSON file
+  5. Click "Create" -> download the JSON file
 
   6. Upload the file to this server:
      ${chalk.dim(`scp ~/Downloads/client_secret_*.json root@SERVER:${credsPath}`)}
 `));
 
-      const waitForFile = await confirm({
-        message: 'Have you uploaded the credentials file?',
+    const waitForFile = await confirm({
+      message: 'Have you uploaded the credentials file?',
+    });
+
+    if (waitForFile) {
+      const downloadedPath = await input({
+        message: `Path to credentials JSON (default: ${credsPath}):`,
+        default: credsPath,
       });
 
-      if (waitForFile) {
-        const downloadedPath = await input({
-          message: `Path to credentials JSON (default: ${credsPath}):`,
-          default: credsPath,
-        });
-
-        if (await fileExists(downloadedPath)) {
-          await mkdir(GOGCLI_DIR, { recursive: true });
-          if (downloadedPath !== credsPath) {
-            const content = await readFile(downloadedPath, 'utf8');
-            await writeFile(credsPath, content, 'utf8');
-          }
-          credsFile = credsPath;
-          console.log(chalk.green('✓ Credentials file ready'));
-        } else {
-          console.error(chalk.red(`File not found: ${downloadedPath}`));
-          process.exit(1);
+      if (await fileExists(downloadedPath)) {
+        await mkdir(GOGCLI_DIR, { recursive: true });
+        if (downloadedPath !== credsPath) {
+          const content = await readFile(downloadedPath, 'utf8');
+          await writeFile(credsPath, content, 'utf8');
         }
+        credsFile = credsPath;
+        console.log(chalk.green('Credentials file ready'));
       } else {
-        console.log(chalk.yellow('Skipping Gmail setup. Re-run after uploading credentials.'));
-        process.exit(0);
+        console.error(chalk.red(`File not found: ${downloadedPath}`));
+        process.exit(1);
       }
+    } else {
+      console.log(chalk.yellow('Skipping Gmail setup. Re-run after uploading credentials.'));
+      process.exit(0);
     }
   }
 
@@ -311,7 +273,7 @@ export async function addGmail(options: AddGmailOptions): Promise<void> {
   const alreadyAuthed = gogListResult?.stdout?.includes(email);
 
   if (!alreadyAuthed) {
-    let gogKeyringPassword = await getCliConfigValue('gogKeyrringPassword') as string | undefined;
+    let gogKeyringPassword = await getCliConfigValue('gogKeyringPassword') as string | undefined;
     if (!gogKeyringPassword) {
       console.log(chalk.dim('gog uses an encrypted keyring for OAuth tokens.'));
       gogKeyringPassword = await password({
@@ -322,7 +284,7 @@ export async function addGmail(options: AddGmailOptions): Promise<void> {
         console.log(chalk.yellow(`Generated keyring password: ${chalk.bold(gogKeyringPassword)}`));
         console.log(chalk.dim('Save this - you will need it if you reinstall.'));
       }
-      await setCliConfigValue('gogKeyrringPassword', gogKeyringPassword);
+      await setCliConfigValue('gogKeyringPassword', gogKeyringPassword);
     }
 
     const setCredsSpinner = ora('Setting OAuth credentials in gog...').start();
@@ -470,17 +432,17 @@ export async function addGmail(options: AddGmailOptions): Promise<void> {
   const serviceName = `gmail-watch-${alias}.service`;
 
   try {
-    let gogKeyringPassword = await getCliConfigValue('gogKeyrringPassword') as string | undefined;
+    let gogKeyringPassword = await getCliConfigValue('gogKeyringPassword') as string | undefined;
     if (!gogKeyringPassword) {
       svcSpinner.stop();
       gogKeyringPassword = await password({
         message: 'GOG keyring password (needed for service):',
       });
-      await setCliConfigValue('gogKeyrringPassword', gogKeyringPassword);
+      await setCliConfigValue('gogKeyringPassword', gogKeyringPassword);
       svcSpinner.start('Creating systemd service...');
     }
 
-    const svcContent = buildGmailRunServiceContent({
+    const svcContent = await buildGmailRunServiceContent({
       email,
       port,
       topic,
@@ -488,7 +450,7 @@ export async function addGmail(options: AddGmailOptions): Promise<void> {
       pushToken,
       hookUrl,
       hookToken,
-      gogKeyrungPassword: gogKeyringPassword,
+      gogKeyringPassword: gogKeyringPassword,
     });
 
     await writeSystemdService(serviceName, svcContent);

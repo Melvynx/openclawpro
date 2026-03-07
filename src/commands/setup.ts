@@ -157,9 +157,14 @@ async function installCloudflared(): Promise<void> {
     await run('bash', ['-c',
       'curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | gpg --dearmor -o /etc/apt/keyrings/cloudflare-main.gpg'
     ]);
+    let codename = 'bookworm';
+    try {
+      const result = await run('lsb_release', ['-cs']);
+      if (result.stdout.trim()) codename = result.stdout.trim();
+    } catch {}
     await writeFile(
       '/etc/apt/sources.list.d/cloudflared.list',
-      'deb [signed-by=/etc/apt/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared bookworm main\n',
+      `deb [signed-by=/etc/apt/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared ${codename} main\n`,
       'utf8'
     );
     await aptUpdate();
@@ -195,6 +200,28 @@ async function installGcloud(): Promise<void> {
   } catch (err) {
     spinner.fail(chalk.red(`gcloud install failed: ${(err as Error).message}`));
     spinner.info(chalk.yellow('Install manually: https://cloud.google.com/sdk/docs/install'));
+  }
+}
+
+async function installGog(): Promise<void> {
+  const existing = await commandExists('gog');
+  if (existing) {
+    const v = await getVersion('gog');
+    console.log(chalk.dim(`  gog ${v || ''} already installed`));
+    return;
+  }
+
+  const spinner = ora('Installing gog (gogcli)...').start();
+  try {
+    const arch = process.arch === 'arm64' ? 'arm64' : 'amd64';
+    await run('bash', ['-c',
+      `curl -fsSL "https://github.com/steipete/gogcli/releases/latest/download/gog_linux_${arch}" -o /usr/local/bin/gog && chmod +x /usr/local/bin/gog`
+    ]);
+    const v = await getVersion('gog');
+    spinner.succeed(`gog ${v || ''} installed`);
+  } catch (err) {
+    spinner.fail(chalk.red(`gog install failed: ${(err as Error).message}`));
+    spinner.info(chalk.yellow('Install manually: https://github.com/steipete/gogcli'));
   }
 }
 
@@ -322,12 +349,25 @@ export async function setup(options: SetupOptions): Promise<void> {
     'bun': await commandExists('bun'),
     'cloudflared': await commandExists('cloudflared'),
     'gcloud': await commandExists('gcloud'),
+    'gog': await commandExists('gog'),
+  };
+
+  const toolDescriptions: Record<string, string> = {
+    'Node.js': 'JavaScript runtime',
+    'openclaw': 'AI gateway',
+    'gh': 'GitHub CLI',
+    'claude': 'Claude Code AI assistant',
+    'bun': 'JavaScript runtime & toolkit',
+    'cloudflared': 'Cloudflare Tunnel daemon',
+    'gcloud': 'Google Cloud CLI',
+    'gog': 'Gmail OAuth CLI',
   };
 
   for (const [name, installed] of Object.entries(checks)) {
     const icon = installed ? chalk.green('✓') : chalk.dim('✗');
-    const v = installed ? await getVersion(name === 'openclaw' ? 'openclaw' : name) : null;
-    console.log(`  ${icon} ${name}${v ? chalk.dim(` (${v})`) : ''}`);
+    const v = installed ? await getVersion(name === 'Node.js' ? 'node' : name) : null;
+    const desc = toolDescriptions[name] ? chalk.dim(` - ${toolDescriptions[name]}`) : '';
+    console.log(`  ${icon} ${name}${v ? chalk.dim(` (${v})`) : ''}${desc}`);
   }
 
   const allInstalled = Object.values(checks).every(Boolean);
@@ -359,6 +399,7 @@ export async function setup(options: SetupOptions): Promise<void> {
     await installBun();
     await installCloudflared();
     await installGcloud();
+    await installGog();
     console.log(chalk.green('\n✓ Tools installed'));
   } else {
     skip('all tools already installed');

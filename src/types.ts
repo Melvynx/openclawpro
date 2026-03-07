@@ -64,7 +64,7 @@ export interface CloudflareConfig {
 
 export interface CliConfig {
   hooksDomain?: string;
-  gogKeyrringPassword?: string;
+  gogKeyringPassword?: string;
   cloudflare?: CloudflareConfig;
   proxyRoutes?: ProxyRoutes;
   [key: string]: unknown;
@@ -164,7 +164,7 @@ export interface GmailServiceOptions {
   pushToken: string;
   hookUrl: string;
   hookToken: string;
-  gogKeyrungPassword: string;
+  gogKeyringPassword: string;
 }
 
 // ─── Webhook Templates ───────────────────────────────────────

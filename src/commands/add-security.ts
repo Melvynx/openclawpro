@@ -42,10 +42,8 @@ export async function addSecurity(): Promise<void> {
       await run('ufw', ['default', 'deny', 'incoming']);
       await run('ufw', ['default', 'allow', 'outgoing']);
       await run('ufw', ['allow', 'ssh']);
-      await run('ufw', ['allow', '80/tcp']);
-      await run('ufw', ['allow', '443/tcp']);
       await run('ufw', ['--force', 'enable']);
-      ufwSpinner.succeed('UFW enabled (SSH/80/443 allowed)');
+      ufwSpinner.succeed('UFW enabled (SSH allowed)');
     } else {
       await runSafe('ufw', ['allow', 'ssh']);
       ufwSpinner.succeed('UFW already active (verified SSH rule)');
@@ -125,12 +123,19 @@ bantime  = 24h
 
     await writeFile('/etc/ssh/sshd_config', newConfig, 'utf8');
 
-    const validate = await runSafe('sshd', ['-t']);
+    let validate = await runSafe('sshd', ['-t']);
+    if (validate === null) {
+      validate = await runSafe('/usr/sbin/sshd', ['-t']);
+    }
     if (validate === null) {
       await writeFile('/etc/ssh/sshd_config', sshdConfig, 'utf8');
       sshSpinner.fail(chalk.red('SSH config validation failed - restored original'));
     } else {
-      await run('systemctl', ['reload', 'sshd']);
+      try {
+        await run('systemctl', ['reload', 'sshd']);
+      } catch {
+        await run('systemctl', ['reload', 'ssh']);
+      }
       sshSpinner.succeed(
         applied.length > 0
           ? `SSH hardened: ${applied.join(', ')}`

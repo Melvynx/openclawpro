@@ -223,11 +223,8 @@ EOF
 chmod +x /usr/local/bin/claude-run
 ok "claude-run wrapper created at /usr/local/bin/claude-run"
 
-# Systemd user service for OpenClaw gateway
-loginctl enable-linger root 2>/dev/null || true
-mkdir -p /root/.config/systemd/user
-
-cat > /root/.config/systemd/user/openclaw-gateway.service << 'EOF'
+# Systemd system service for OpenClaw gateway
+cat > /etc/systemd/system/openclaw-gateway.service << 'EOF'
 [Unit]
 Description=OpenClaw Gateway
 After=network.target
@@ -242,13 +239,12 @@ Environment=IS_SANDBOX=1
 Environment=BROWSER=echo
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 EOF
 
 # Enable and try to start the service (may fail without full config)
-export XDG_RUNTIME_DIR="/run/user/0"
-systemctl --user daemon-reload 2>/dev/null || true
-systemctl --user enable openclaw-gateway 2>/dev/null || true
+systemctl daemon-reload 2>/dev/null || true
+systemctl enable openclaw-gateway 2>/dev/null || true
 ok "OpenClaw systemd service configured"
 
 # ─────────────────────────────────────────────
@@ -261,12 +257,11 @@ cat >> /root/.bashrc << 'ALIASES'
 
 # ClawPro aliases
 alias oc='openclaw'
-alias oc-logs='journalctl --user -u openclaw-gateway -f'
-alias oc-restart='systemctl --user restart openclaw-gateway'
-alias oc-stop='systemctl --user stop openclaw-gateway'
-alias oc-start='systemctl --user start openclaw-gateway'
-alias oc-status='systemctl --user status openclaw-gateway'
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+alias oc-logs='journalctl -u openclaw-gateway -f'
+alias oc-restart='systemctl restart openclaw-gateway'
+alias oc-stop='systemctl stop openclaw-gateway'
+alias oc-start='systemctl start openclaw-gateway'
+alias oc-status='systemctl status openclaw-gateway'
 ALIASES
 ok "Aliases added to ~/.bashrc"
 else
@@ -352,8 +347,7 @@ fi
 # Start gateway
 # ─────────────────────────────────────────────
 echo ""
-export XDG_RUNTIME_DIR="/run/user/0"
-systemctl --user start openclaw-gateway 2>/dev/null || true
+systemctl start openclaw-gateway 2>/dev/null || true
 
 # ─────────────────────────────────────────────
 # Done
