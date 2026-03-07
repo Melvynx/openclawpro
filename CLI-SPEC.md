@@ -1,15 +1,15 @@
-# openclawpro CLI Specification
+# openclaw-vps CLI Specification
 
 ## Overview
-A Node.js CLI tool published as `openclawpro` on npm.
-Usage: `npx openclawpro <command>`
+A Node.js CLI tool published as `openclaw-vps` on npm.
+Usage: `npx openclaw-vps <command>`
 
 Built with: Node.js (no build step needed), uses `#!/usr/bin/env node`
 Dependencies: minimal (commander, chalk, ora, inquirer/prompts)
 
 ## Commands
 
-### `npx openclawpro setup`
+### `npx openclaw-vps setup`
 Full VPS setup. Interactive wizard that:
 
 1. **System check**: Detects OS, checks root, shows what's already installed
@@ -24,7 +24,7 @@ Full VPS setup. Interactive wizard that:
 
 Each step shows a spinner, checks if already done (idempotent), and can be skipped.
 
-### `npx openclawpro add gmail`
+### `npx openclaw-vps add gmail`
 Add a Gmail account for real-time notifications. THIS IS THE KILLER FEATURE.
 
 Options:
@@ -102,7 +102,7 @@ Flow:
    - Restart: systemctl restart gmail-watch-mal2
    ```
 
-### `npx openclawpro add webhook`
+### `npx openclaw-vps add webhook`
 Add a custom webhook (Codeline, Stripe, GitHub, etc.)
 
 Options:
@@ -117,7 +117,7 @@ Flow:
 3. Restart hooks-proxy + gateway
 4. Show webhook URL + test curl
 
-### `npx openclawpro status`
+### `npx openclaw-vps status`
 Show status of all services:
 - OpenClaw Gateway (running/stopped)
 - Hooks Proxy (running/stopped)
@@ -125,20 +125,20 @@ Show status of all services:
 - Gmail watches (per account, running/stopped)
 - Custom webhooks (configured routes)
 
-### `npx openclawpro add cloudflare`
+### `npx openclaw-vps add cloudflare`
 Setup or reconfigure Cloudflare Tunnel.
 
-### `npx openclawpro add security`
+### `npx openclaw-vps add security`
 Apply security hardening (UFW, fail2ban, SSH, unattended-upgrades).
 
 ## Technical Details
 
 ### Project Structure
 ```
-openclawpro/
+openclaw-vps/
 ├── package.json
 ├── bin/
-│   └── openclawpro.js          # Entry point
+│   └── openclaw-vps.js          # Entry point
 ├── src/
 │   ├── index.js                # Commander setup
 │   ├── utils/

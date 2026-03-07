@@ -234,30 +234,26 @@ WantedBy=multi-user.target
 // ─── Gateway Service ──────────────────────────────────────────
 
 async function setupGatewayService(): Promise<void> {
-  const thisFile = fileURLToPath(import.meta.url);
-  const templatePath = join(dirname(thisFile), '..', '..', 'templates', 'gateway-service.template');
+  const nodePath = (await runSafe('which', ['node']))?.stdout?.trim() || '/usr/bin/node';
+  const openclawPath = (await runSafe('which', ['openclaw']))?.stdout?.trim() || '/usr/bin/openclaw';
 
-  let svcContent: string;
-  try {
-    svcContent = await readFile(templatePath, 'utf8');
-  } catch {
-    svcContent = `[Unit]
+  const svcContent = `[Unit]
 Description=OpenClaw Gateway
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/openclaw gateway
+ExecStart=${nodePath} ${openclawPath} gateway
 Environment=HOME=/root
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.bun/bin
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 `;
-  }
-
   await writeSystemdService(`${GATEWAY_SERVICE}.service`, svcContent);
   await enableAndStartService(GATEWAY_SERVICE);
 }
@@ -266,7 +262,7 @@ WantedBy=multi-user.target
 
 async function setupAliases(): Promise<void> {
   const bashrc = join(homedir(), '.bashrc');
-  const marker = '# openclawpro aliases';
+  const marker = '# openclaw-vps aliases';
 
   let existing = '';
   try {
@@ -281,8 +277,9 @@ async function setupAliases(): Promise<void> {
   const aliases = `
 ${marker}
 alias oc='openclaw'
-alias oc-status='openclawpro status'
+alias oc-status='openclaw-vps status'
 alias oc-logs='journalctl -u openclaw-gateway -f'
+alias oc-restart='systemctl restart openclaw-gateway'
 alias hooks-logs='journalctl -u openclaw-hooks-proxy -f'
 alias gmail-logs='journalctl -u gmail-watch-* -f'
 `;
@@ -376,7 +373,7 @@ export async function setup(options: SetupOptions): Promise<void> {
     await runSecurityHardening();
   } else {
     skip('security hardening');
-    console.log(chalk.dim('  Run later: openclawpro add security'));
+    console.log(chalk.dim('  Run later: openclaw-vps add security'));
   }
 
   // ── Step 3: OpenClaw Onboard ──────────────────────────────
@@ -425,7 +422,7 @@ export async function setup(options: SetupOptions): Promise<void> {
       await addCloudflare(options as Record<string, unknown>);
     } else {
       skip('Cloudflare tunnel');
-      console.log(chalk.dim('  Run later: openclawpro add cloudflare'));
+      console.log(chalk.dim('  Run later: openclaw-vps add cloudflare'));
     }
   }
 
@@ -488,20 +485,44 @@ export async function setup(options: SetupOptions): Promise<void> {
     skip('aliases');
   }
 
-  // ── Summary ───────────────────────────────────────────────
-  console.log('\n' + chalk.bold.green('✅ Setup complete!') + '\n');
+  // ── Summary: verify & auto-fix ──────────────────────────
+  console.log('\n' + chalk.bold.cyan('Verifying services...') + '\n');
 
-  const [gwStat, proxyStat, cfStat] = await Promise.all([
-    getServiceStatus('openclaw-gateway'),
-    getServiceStatus('openclaw-hooks-proxy'),
-    getServiceStatus('cloudflared'),
-  ]);
+  const servicesToCheck = [
+    { name: 'openclaw-gateway', label: 'OpenClaw Gateway' },
+    { name: 'openclaw-hooks-proxy', label: 'Hooks Proxy' },
+    { name: 'cloudflared', label: 'Cloudflare Tunnel' },
+  ];
 
-  const statusIcon = (s: string) => s === 'active' ? chalk.green('●') : chalk.red('✗');
+  for (const svc of servicesToCheck) {
+    let status = await getServiceStatus(svc.name);
 
-  console.log(`  ${statusIcon(gwStat)} openclaw-gateway`);
-  console.log(`  ${statusIcon(proxyStat)} openclaw-hooks-proxy`);
-  console.log(`  ${statusIcon(cfStat)} cloudflared`);
+    if (status !== 'active') {
+      const retrySpinner = ora(`${svc.label} not running - restarting...`).start();
+      try {
+        await restartService(svc.name);
+        await new Promise((r) => setTimeout(r, 2000));
+        status = await getServiceStatus(svc.name);
+        if (status === 'active') {
+          retrySpinner.succeed(`${svc.label} restarted successfully`);
+        } else {
+          retrySpinner.fail(`${svc.label} failed to start (${status})`);
+          const logs = await runSafe('journalctl', ['-u', svc.name, '-n', '5', '--no-pager']);
+          if (logs?.stdout) {
+            console.log(chalk.dim('  Last logs:'));
+            for (const line of logs.stdout.split('\n').slice(0, 3)) {
+              console.log(chalk.dim(`    ${line.trim()}`));
+            }
+          }
+        }
+      } catch {
+        retrySpinner.fail(`${svc.label} could not be restarted`);
+      }
+    } else {
+      console.log(`  ${chalk.green('●')} ${svc.label}`);
+    }
+  }
+
   console.log('');
 
   const hooksDomain = await getCliConfigValue('hooksDomain');
@@ -509,10 +530,38 @@ export async function setup(options: SetupOptions): Promise<void> {
     console.log(chalk.bold('Hooks URL:   ') + chalk.cyan(`https://${hooksDomain}`));
   }
 
-  console.log(chalk.bold('\nNext steps:'));
-  console.log(chalk.dim('  openclawpro add gmail     # Add Gmail account'));
-  console.log(chalk.dim('  openclawpro add webhook   # Add custom webhook'));
-  console.log(chalk.dim('  openclawpro status        # Check all services'));
+  // Final status
+  const [gwFinal, proxyFinal, cfFinal] = await Promise.all([
+    getServiceStatus('openclaw-gateway'),
+    getServiceStatus('openclaw-hooks-proxy'),
+    getServiceStatus('cloudflared'),
+  ]);
+
+  const allOk = gwFinal === 'active' && proxyFinal === 'active' && cfFinal === 'active';
+
+  if (allOk) {
+    console.log('\n' + chalk.bold.green('✅ Setup complete! All services running.') + '\n');
+  } else {
+    console.log('\n' + chalk.bold.yellow('⚠  Setup complete but some services need attention.') + '\n');
+    if (gwFinal !== 'active') {
+      console.log(chalk.yellow('  Gateway not running. Did you complete "openclaw onboard"?'));
+      console.log(chalk.dim('  Fix: openclaw onboard && systemctl restart openclaw-gateway'));
+    }
+    if (proxyFinal !== 'active') {
+      console.log(chalk.yellow('  Hooks proxy not running.'));
+      console.log(chalk.dim('  Fix: systemctl restart openclaw-hooks-proxy'));
+    }
+    if (cfFinal !== 'active') {
+      console.log(chalk.yellow('  Cloudflare tunnel not running.'));
+      console.log(chalk.dim('  Fix: openclaw-vps add cloudflare'));
+    }
+    console.log('');
+  }
+
+  console.log(chalk.bold('Next steps:'));
+  console.log(chalk.dim('  openclaw-vps add gmail     # Add Gmail account'));
+  console.log(chalk.dim('  openclaw-vps add webhook   # Add custom webhook'));
+  console.log(chalk.dim('  openclaw-vps status        # Check all services'));
   console.log(chalk.dim('  source ~/.bashrc          # Load aliases'));
   console.log('');
 }

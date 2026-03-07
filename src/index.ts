@@ -21,7 +21,7 @@ export async function main(): Promise<void> {
   const program = new Command();
 
   program
-    .name('openclawpro')
+    .name('openclaw-vps')
     .description(chalk.cyan('🦞 OpenClaw VPS setup tool'))
     .version(version);
 
@@ -99,7 +99,7 @@ export async function main(): Promise<void> {
   // ── Error handling ───────────────────────────────────────
   program.on('command:*', (operands: string[]) => {
     console.error(chalk.red(`Unknown command: ${operands.join(' ')}`));
-    console.log(chalk.dim('Run: openclawpro --help'));
+    console.log(chalk.dim('Run: openclaw-vps --help'));
     process.exit(1);
   });
 

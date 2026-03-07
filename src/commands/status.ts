@@ -161,8 +161,8 @@ export async function showStatus(): Promise<void> {
   // ── Quick commands ────────────────────────────────────────
   console.log(chalk.bold('Quick Commands'));
   console.log('─'.repeat(50));
-  console.log(chalk.dim('  openclawpro add gmail    # Add Gmail account'));
-  console.log(chalk.dim('  openclawpro add webhook  # Add custom webhook'));
+  console.log(chalk.dim('  openclaw-vps add gmail    # Add Gmail account'));
+  console.log(chalk.dim('  openclaw-vps add webhook  # Add custom webhook'));
   console.log(chalk.dim('  journalctl -u openclaw-gateway -f  # View gateway logs'));
   console.log('');
 }

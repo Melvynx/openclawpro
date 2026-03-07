@@ -59,8 +59,8 @@ export async function addCloudflare(_options: Record<string, unknown> = {}): Pro
   // ── Get tunnel token ──────────────────────────────────────
   console.log(chalk.bold('\nTunnel Configuration'));
   console.log(chalk.dim('You need a Cloudflare Tunnel token. Create one at:'));
-  console.log(chalk.cyan('  https://one.dash.cloudflare.com/ → Zero Trust → Networks → Tunnels'));
-  console.log(chalk.dim('Click "Create a tunnel" → Cloudflared → copy the token from the run command.\n'));
+  console.log(chalk.cyan('  https://dash.cloudflare.com/ → Zero Trust → Networks → Tunnels'));
+  console.log(chalk.dim('Click "Create a tunnel" → Cloudflared → select Debian 64-bit → copy the token from the run command.\n'));
 
   let tunnelToken = await input({
     message: 'Cloudflare Tunnel token:',
@@ -79,30 +79,28 @@ export async function addCloudflare(_options: Record<string, unknown> = {}): Pro
   });
   hooksDomain = hooksDomain.trim().replace(/^https?:\/\//, '');
 
-  // ── Create/update systemd service ────────────────────────
-  const svcSpinner = ora('Creating cloudflared systemd service...').start();
+  // ── Install as system service (official Cloudflare method) ─
+  const svcSpinner = ora('Installing cloudflared as system service...').start();
   try {
-    const svcContent = `[Unit]
-Description=cloudflared
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-TimeoutStartSec=15
-Type=notify
-ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run --token ${tunnelToken}
-Restart=on-failure
-RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target
-`;
-    await writeSystemdService('cloudflared.service', svcContent);
-    await enableAndStartService('cloudflared');
-    svcSpinner.succeed('cloudflared service running');
+    await run('cloudflared', ['service', 'install', tunnelToken]);
+    svcSpinner.succeed('cloudflared service installed and running');
   } catch (err) {
-    svcSpinner.fail(chalk.red(`Service setup failed: ${(err as Error).message}`));
-    process.exit(1);
+    // Fallback: already installed or needs manual restart
+    const errMsg = (err as Error).message;
+    if (errMsg.includes('already exists') || errMsg.includes('already installed')) {
+      svcSpinner.text = 'Updating cloudflared service...';
+      try {
+        await runSafe('cloudflared', ['service', 'uninstall']);
+        await run('cloudflared', ['service', 'install', tunnelToken]);
+        svcSpinner.succeed('cloudflared service updated and running');
+      } catch (err2) {
+        svcSpinner.fail(chalk.red(`Service update failed: ${(err2 as Error).message}`));
+        process.exit(1);
+      }
+    } else {
+      svcSpinner.fail(chalk.red(`Service install failed: ${errMsg}`));
+      process.exit(1);
+    }
   }
 
   // ── Store CLI config ──────────────────────────────────────
@@ -119,9 +117,15 @@ WantedBy=multi-user.target
 
   // ── API Token (optional) ──────────────────────────────────
   console.log(chalk.bold('\nCloudflare API Token (optional)'));
-  console.log(chalk.dim('Used to add routes programmatically when you run "openclawpro add gmail".'));
-  console.log(chalk.dim('Create at: https://dash.cloudflare.com/profile/api-tokens'));
-  console.log(chalk.dim('Required permissions: Cloudflare Tunnel:Edit, DNS:Edit\n'));
+  console.log(chalk.dim('Used to add routes programmatically when you run "openclaw-vps add gmail".'));
+  console.log(chalk.dim('Create one at:'));
+  console.log(chalk.cyan('  https://dash.cloudflare.com/profile/api-tokens'));
+  console.log(chalk.dim('\n  1. Click "Create Token"'));
+  console.log(chalk.dim('  2. Select "Create Custom Token"'));
+  console.log(chalk.dim('  3. Add permissions:'));
+  console.log(chalk.dim(`     - ${chalk.white('Account')} → ${chalk.white('Cloudflare Tunnel')} → ${chalk.white('Edit')}`));
+  console.log(chalk.dim(`     - ${chalk.white('Zone')} → ${chalk.white('DNS')} → ${chalk.white('Edit')}`));
+  console.log(chalk.dim('  4. Continue → Create Token → copy it\n'));
 
   const storeApiToken = await confirm({
     message: 'Store Cloudflare API token for programmatic route management?',
@@ -139,12 +143,12 @@ WantedBy=multi-user.target
   // ── Instructions for public hostname ──────────────────────
   console.log('\n' + chalk.bold.yellow('⚠  Add public hostname in Cloudflare dashboard:'));
   console.log(chalk.white(`
-  1. Go to: https://one.dash.cloudflare.com/ → Zero Trust → Networks → Tunnels
+  1. Go to: https://dash.cloudflare.com/ → Zero Trust → Networks → Tunnels
   2. Click on your tunnel → "Public Hostname" tab
   3. Add hostname:
-     - Subdomain: ${hooksDomain.split('.')[0]}
-     - Domain: ${hooksDomain.split('.').slice(1).join('.')}
-     - Service: HTTP  → localhost:18800
+     - Subdomain: ${chalk.bold(hooksDomain.split('.')[0])}
+     - Domain: ${chalk.bold(hooksDomain.split('.').slice(1).join('.'))}
+     - Service URL: ${chalk.bold.cyan('http://localhost:18800')}
   4. Save
 `));
 

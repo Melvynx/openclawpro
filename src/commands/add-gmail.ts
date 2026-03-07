@@ -110,7 +110,7 @@ export async function addGmail(options: AddGmailOptions): Promise<void> {
   const [hasGcloud, hasGog, hasOpenclaw] = checks;
 
   if (!hasGcloud) {
-    console.error(chalk.red('✗ gcloud not installed. Run: openclawpro setup'));
+    console.error(chalk.red('✗ gcloud not installed. Run: openclaw-vps setup'));
     process.exit(1);
   }
   if (!hasGog) {
@@ -118,7 +118,7 @@ export async function addGmail(options: AddGmailOptions): Promise<void> {
     process.exit(1);
   }
   if (!hasOpenclaw) {
-    console.error(chalk.red('✗ openclaw not installed. Run: openclawpro setup'));
+    console.error(chalk.red('✗ openclaw not installed. Run: openclaw-vps setup'));
     process.exit(1);
   }
 
@@ -528,7 +528,7 @@ export async function addGmail(options: AddGmailOptions): Promise<void> {
         'gmail', 'send',
         '--to', email,
         '--subject', 'URGENT: OpenClaw Gmail Test',
-        '--body', 'This is a test notification from openclawpro. If you receive a Telegram message, setup is complete!',
+        '--body', 'This is a test notification from openclaw-vps. If you receive a Telegram message, setup is complete!',
         '--account', email,
       ]);
       testSpinner.succeed('Test email sent');

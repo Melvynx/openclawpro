@@ -6,21 +6,21 @@ Ultra-simple VPS setup for OpenClaw. TypeScript CLI that automates everything.
 
 ```bash
 # Full VPS setup (one command)
-npx openclawpro setup
+npx openclaw-vps setup
 
 # Add Gmail notifications (the killer feature)
-npx openclawpro add gmail -e your@gmail.com
+npx openclaw-vps add gmail -e your@gmail.com
 
 # Add custom webhook
-npx openclawpro add webhook --name codeline --secret YOUR_SECRET
+npx openclaw-vps add webhook --name codeline --secret YOUR_SECRET
 
 # Check status
-npx openclawpro status
+npx openclaw-vps status
 ```
 
 ## Commands
 
-### `npx openclawpro setup`
+### `npx openclaw-vps setup`
 
 Full VPS setup wizard:
 1. Install Node.js 22, OpenClaw, gh, Claude Code, Bun, Cloudflared, gcloud CLI
@@ -32,7 +32,7 @@ Full VPS setup wizard:
 
 **Idempotent** - safe to re-run, skips what's already installed.
 
-### `npx openclawpro add gmail`
+### `npx openclaw-vps add gmail`
 
 THE KILLER FEATURE - Gmail real-time notifications in one command.
 
@@ -58,13 +58,13 @@ Options:
 
 Example:
 ```bash
-npx openclawpro add gmail \
+npx openclaw-vps add gmail \
   -e melvynmal2@gmail.com \
   --model anthropic/claude-opus-4-6 \
   --target -5176368405
 ```
 
-### `npx openclawpro add webhook`
+### `npx openclaw-vps add webhook`
 
 Add a custom webhook (Codeline, Stripe, GitHub, etc.)
 
@@ -82,19 +82,19 @@ Updates:
 Example:
 ```bash
 # Codeline-style (secret in body)
-npx openclawpro add webhook \
+npx openclaw-vps add webhook \
   --name codeline \
   --secret uoQ-4gqwj9Fzs6w9zwDe0 \
   --secret-field secret
 
 # Stripe-style (secret in header)
-npx openclawpro add webhook \
+npx openclaw-vps add webhook \
   --name stripe \
   --secret whsec_xxx \
   --secret-header stripe-signature
 ```
 
-### `npx openclawpro add cloudflare`
+### `npx openclaw-vps add cloudflare`
 
 Setup or reconfigure Cloudflare Tunnel.
 
@@ -105,7 +105,7 @@ Interactive wizard for:
 - DNS routing
 - Systemd service
 
-### `npx openclawpro add security`
+### `npx openclaw-vps add security`
 
 Apply security hardening:
 - UFW (firewall) - allow port 22 only
@@ -113,7 +113,7 @@ Apply security hardening:
 - SSH hardening - disable password auth, root login by key only
 - Unattended-upgrades - automatic security updates
 
-### `npx openclawpro status`
+### `npx openclaw-vps status`
 
 Dashboard showing status of:
 - OpenClaw Gateway (running/stopped)
@@ -139,14 +139,14 @@ npm run build
 npm run typecheck
 
 # Test locally
-node bin/openclawpro.js --help
+node bin/openclaw-vps.js --help
 ```
 
 ## Architecture
 
 ```
-openclawpro/
-├── bin/openclawpro.js       # Entry point (calls dist/index.js)
+openclaw-vps/
+├── bin/openclaw-vps.js       # Entry point (calls dist/index.js)
 ├── src/
 │   ├── index.ts             # Commander setup
 │   ├── types.ts             # Shared TypeScript types
@@ -245,7 +245,7 @@ The `add gmail` command is the most complex. Here's what it automates:
 
 **After:**
 ```bash
-npx openclawpro add gmail -e your@gmail.com
+npx openclaw-vps add gmail -e your@gmail.com
 ```
 
 2 minutes. Done.

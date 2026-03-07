@@ -41,7 +41,7 @@ interface CfApiResponse {
 
 async function cfFetch(path: string, opts: CfFetchOptions = {}): Promise<unknown> {
   const apiToken = await getCliConfigValue('cloudflare.apiToken');
-  if (!apiToken) throw new Error('Cloudflare API token not configured. Run: openclawpro add cloudflare');
+  if (!apiToken) throw new Error('Cloudflare API token not configured. Run: openclaw-vps add cloudflare');
 
   const url = `${CF_API}${path}`;
 
@@ -106,7 +106,7 @@ export async function addTunnelHostname(hostname: string, serviceUrl: string): P
   const { accountId, tunnelId } = cfg;
 
   if (!accountId || !tunnelId) {
-    throw new Error('Cloudflare tunnel info not configured. Run: openclawpro add cloudflare');
+    throw new Error('Cloudflare tunnel info not configured. Run: openclaw-vps add cloudflare');
   }
 
   const current = await getTunnelConfig(accountId, tunnelId);

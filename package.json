@@ -1,14 +1,23 @@
 {
-  "name": "openclawpro",
+  "name": "openclaw-vps",
   "version": "0.1.0",
   "description": "One-command setup for OpenClaw on a VPS",
   "type": "module",
   "bin": {
-    "openclawpro": "./bin/openclawpro.js"
+    "openclaw-vps": "./bin/openclaw-vps.js"
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "author": "Melvyn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aiblueprint/openclawpro.git"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "files": [
     "bin/",

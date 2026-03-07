@@ -10,7 +10,7 @@ const OPENCLAW_DIR = join(homedir(), '.openclaw');
 const OPENCLAW_JSON = join(OPENCLAW_DIR, 'openclaw.json');
 const HOOKS_PROXY_PATH = join(OPENCLAW_DIR, 'hooks-proxy.mjs');
 const GOGCLI_DIR = join(OPENCLAW_DIR, 'gogcli');
-const CLI_CONFIG_DIR = join(homedir(), '.openclawpro');
+const CLI_CONFIG_DIR = join(homedir(), '.openclaw-vps');
 const CLI_CONFIG_PATH = join(CLI_CONFIG_DIR, 'config.json');
 
 export { OPENCLAW_JSON, HOOKS_PROXY_PATH, OPENCLAW_DIR, GOGCLI_DIR, CLI_CONFIG_DIR };
