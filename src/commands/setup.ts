@@ -282,6 +282,7 @@ alias oc-logs='journalctl -u openclaw-gateway -f'
 alias oc-restart='systemctl restart openclaw-gateway'
 alias hooks-logs='journalctl -u openclaw-hooks-proxy -f'
 alias gmail-logs='journalctl -u gmail-watch-* -f'
+alias claude='IS_SANDBOX=1 claude --dangerously-skip-permissions'
 `;
 
   await appendFile(bashrc, aliases, 'utf8');
