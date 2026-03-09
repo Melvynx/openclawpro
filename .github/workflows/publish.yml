@@ -62,6 +62,7 @@ jobs:
       - name: Bump version, build, tag & publish
         if: steps.changes.outputs.has_changes == 'true'
         run: |
+          git checkout -- package-lock.json 2>/dev/null || git clean -fd package-lock.json 2>/dev/null || true
           npm version patch -m "chore: release v%s"
           npm run build
           npm publish --provenance --access public
