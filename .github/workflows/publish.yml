@@ -1,0 +1,67 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    if: "!startsWith(github.event.head_commit.message, 'chore: release')"
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm for OIDC
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+
+      - name: Check for changes since last tag
+        id: changes
+        run: |
+          LAST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          echo "Last tag: $LAST_TAG"
+          if [ -z "$LAST_TAG" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED_FILES=$(git diff --name-only $LAST_TAG HEAD -- src/ bin/ templates/ ':!package.json')
+            echo "Changed files since $LAST_TAG:"
+            echo "$CHANGED_FILES"
+            if [ -n "$CHANGED_FILES" ]; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Bump version, build, tag & publish
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          npm version patch -m "chore: release v%s"
+          npm run build
+          npm publish --provenance --access public
+          git push --follow-tags
