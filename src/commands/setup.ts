@@ -54,6 +54,27 @@ async function aptUpdate(): Promise<void> {
 
 // ─── Individual Installers ────────────────────────────────────
 
+async function installHomebrew(): Promise<void> {
+  const existing = await commandExists('brew');
+  if (existing) {
+    console.log(chalk.dim('  brew already installed'));
+    return;
+  }
+
+  const spinner = ora('Installing Homebrew...').start();
+  try {
+    await run('bash', ['-c',
+      'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+    ]);
+    await runSafe('bash', ['-c',
+      'echo \'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\' >> ~/.bashrc && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
+    ]);
+    spinner.succeed('Homebrew installed');
+  } catch (err) {
+    spinner.fail(chalk.red(`Homebrew install failed: ${(err as Error).message}`));
+  }
+}
+
 async function installNodejs(): Promise<void> {
   const existing = await getVersion('node');
   if (existing && parseInt(existing) >= 22) {
@@ -313,6 +334,7 @@ export async function setup(options: SetupOptions): Promise<void> {
   // ── System check ────────────────────────────────────────────
   stepHeader(0, 'System Check');
   const checks: Record<string, boolean> = {
+    'brew': await commandExists('brew'),
     'Node.js': await commandExists('node'),
     'openclaw': await commandExists('openclaw'),
     'gh': await commandExists('gh'),
@@ -350,6 +372,7 @@ export async function setup(options: SetupOptions): Promise<void> {
     await Promise.all([
       aptInstall('curl', 'wget', 'git', 'build-essential', 'unzip'),
     ]);
+    await installHomebrew();
     await installNodejs();
     await installOpenclaw();
     await installGhCli();
