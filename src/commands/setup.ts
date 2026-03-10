@@ -63,12 +63,13 @@ async function installHomebrew(): Promise<void> {
 
   const spinner = ora('Installing Homebrew...').start();
   try {
+    // Homebrew refuses to run as root — use a dedicated "linuxbrew" user
+    await runSafe('bash', ['-c', 'id -u linuxbrew &>/dev/null || useradd -m -s /bin/bash linuxbrew']);
     await run('bash', ['-c',
-      'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+      'sudo -u linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
     ]);
-    await runSafe('bash', ['-c',
-      'echo \'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\' >> ~/.bashrc && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
-    ]);
+    const shellEnv = 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"';
+    await runSafe('bash', ['-c', `grep -q linuxbrew /root/.bashrc || echo '${shellEnv}' >> /root/.bashrc`]);
     spinner.succeed('Homebrew installed');
   } catch (err) {
     spinner.fail(chalk.red(`Homebrew install failed: ${(err as Error).message}`));
@@ -304,6 +305,7 @@ alias oc-restart='systemctl restart openclaw-gateway'
 alias hooks-logs='journalctl -u openclaw-hooks-proxy -f'
 alias gmail-logs='journalctl -u gmail-watch-* -f'
 alias claude='IS_SANDBOX=1 claude --dangerously-skip-permissions'
+alias brew='sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew'
 `;
 
   await appendFile(bashrc, aliases, 'utf8');
