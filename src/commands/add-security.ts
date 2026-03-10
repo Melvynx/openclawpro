@@ -130,7 +130,8 @@ bantime  = 24h
       await writeFile('/etc/ssh/sshd_config', sshdConfig, 'utf8');
       sshSpinner.fail(chalk.red('SSH config validation failed - restored original'));
     } else {
-      await run('systemctl', ['reload', 'sshd']);
+      const sshServiceName = await runSafe('systemctl', ['cat', 'ssh']) ? 'ssh' : 'sshd';
+      await run('systemctl', ['reload', sshServiceName]);
       sshSpinner.succeed(
         applied.length > 0
           ? `SSH hardened: ${applied.join(', ')}`
