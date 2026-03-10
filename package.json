@@ -14,7 +14,7 @@
   "author": "Melvyn",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aiblueprint/openclawpro.git"
+    "url": "git+https://github.com/Melvynx/openclawpro.git"
   },
   "engines": {
     "node": ">=18"
