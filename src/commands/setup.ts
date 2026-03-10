@@ -68,9 +68,13 @@ async function installHomebrew(): Promise<void> {
     await run('bash', ['-c',
       'sudo -u linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
     ]);
+    // Create a root-safe wrapper so any process (not just interactive shells) can call `brew`
+    const wrapper = '#!/bin/bash\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"';
+    await writeFile('/usr/local/bin/brew', wrapper, { mode: 0o755 });
+
     const shellEnv = 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"';
     await runSafe('bash', ['-c', `grep -q linuxbrew /root/.bashrc || echo '${shellEnv}' >> /root/.bashrc`]);
-    spinner.succeed('Homebrew installed');
+    spinner.succeed('Homebrew installed (root-safe wrapper at /usr/local/bin/brew)');
   } catch (err) {
     spinner.fail(chalk.red(`Homebrew install failed: ${(err as Error).message}`));
   }
@@ -305,7 +309,6 @@ alias oc-restart='systemctl restart openclaw-gateway'
 alias hooks-logs='journalctl -u openclaw-hooks-proxy -f'
 alias gmail-logs='journalctl -u gmail-watch-* -f'
 alias claude='IS_SANDBOX=1 claude --dangerously-skip-permissions'
-alias brew='sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew'
 `;
 
   await appendFile(bashrc, aliases, 'utf8');
