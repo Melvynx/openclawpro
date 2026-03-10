@@ -237,6 +237,8 @@ async function setupHooksProxy(hookToken: string, _gatewayPort: number): Promise
   const routes = await readProxyRoutes();
   await writeProxyRoutes(routes);
 
+  const nodePath = (await runSafe('which', ['node']))?.stdout?.trim() || '/usr/bin/node';
+
   const svcContent = `[Unit]
 Description=OpenClaw Hooks Proxy (auth injection for external webhooks)
 After=network-online.target
@@ -244,7 +246,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/node ${HOOKS_PROXY_PATH}
+ExecStart=${nodePath} ${HOOKS_PROXY_PATH}
 Environment=OPENCLAW_HOOK_TOKEN=${hookToken}
 Environment=PORT=${HOOKS_PROXY_PORT}
 Restart=always
