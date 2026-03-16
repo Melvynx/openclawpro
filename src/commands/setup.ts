@@ -54,30 +54,66 @@ async function aptUpdate(): Promise<void> {
 
 // ─── Individual Installers ────────────────────────────────────
 
+async function ensureBrewWrapper(): Promise<void> {
+  const wrapperPath = '/usr/local/bin/brew';
+  const wrapper = '#!/bin/bash\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"';
+
+  let needsWrite = true;
+  try {
+    const existing = await readFile(wrapperPath, 'utf8');
+    if (existing.includes('sudo -u linuxbrew')) needsWrite = false;
+  } catch {}
+
+  if (needsWrite) {
+    await writeFile(wrapperPath, wrapper, { mode: 0o755 });
+    console.log(chalk.dim('  root-safe brew wrapper created at /usr/local/bin/brew'));
+  }
+
+  // Ensure /usr/local/bin is first in PATH so the wrapper takes precedence
+  // over the real brew binary added by `brew shellenv`
+  if (!process.env.PATH?.startsWith('/usr/local/bin')) {
+    process.env.PATH = `/usr/local/bin:${process.env.PATH}`;
+  }
+
+  const bashrc = join(homedir(), '.bashrc');
+  let bashrcContent = '';
+  try { bashrcContent = await readFile(bashrc, 'utf8'); } catch {}
+
+  if (!bashrcContent.includes('brew shellenv')) {
+    const shellEnv = 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"\nexport PATH="/usr/local/bin:$PATH"\n';
+    await appendFile(bashrc, shellEnv, 'utf8');
+  } else if (!bashrcContent.includes('export PATH="/usr/local/bin:$PATH"')) {
+    // Fix existing shellenv: add PATH override after it
+    bashrcContent = bashrcContent.replace(
+      /(eval "\$\(\/home\/linuxbrew\/\.linuxbrew\/bin\/brew shellenv\)")/,
+      '$1\nexport PATH="/usr/local/bin:$PATH"'
+    );
+    await writeFile(bashrc, bashrcContent, 'utf8');
+  }
+}
+
 async function installHomebrew(): Promise<void> {
   const existing = await commandExists('brew');
   if (existing) {
     console.log(chalk.dim('  brew already installed'));
+    await ensureBrewWrapper();
     return;
   }
 
   const spinner = ora('Installing Homebrew...').start();
   try {
-    // Homebrew refuses to run as root — use a dedicated "linuxbrew" user
     await runSafe('bash', ['-c', 'id -u linuxbrew &>/dev/null || useradd -m -s /bin/bash linuxbrew']);
     await run('bash', ['-c',
       'sudo -u linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
     ]);
-    // Create a root-safe wrapper so any process (not just interactive shells) can call `brew`
-    const wrapper = '#!/bin/bash\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"';
-    await writeFile('/usr/local/bin/brew', wrapper, { mode: 0o755 });
-
-    const shellEnv = 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"';
-    await runSafe('bash', ['-c', `grep -q linuxbrew /root/.bashrc || echo '${shellEnv}' >> /root/.bashrc`]);
-    spinner.succeed('Homebrew installed (root-safe wrapper at /usr/local/bin/brew)');
+    spinner.succeed('Homebrew installed');
   } catch (err) {
     spinner.fail(chalk.red(`Homebrew install failed: ${(err as Error).message}`));
+    return;
   }
+
+  await ensureBrewWrapper();
+  console.log(chalk.dim('  root-safe brew wrapper configured'));
 }
 
 async function installNodejs(): Promise<void> {
@@ -390,6 +426,12 @@ export async function setup(options: SetupOptions): Promise<void> {
     console.log(chalk.green('\n✓ Tools installed'));
   } else {
     skip('all tools already installed');
+  }
+
+  // Always ensure the brew wrapper exists and PATH is correct,
+  // even when tool installation was skipped
+  if (await commandExists('brew')) {
+    await ensureBrewWrapper();
   }
 
   // ── Step 2: Security Hardening ────────────────────────────
