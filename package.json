@@ -1,6 +1,6 @@
 {
   "name": "openclaw-vps",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "One-command setup for OpenClaw on a VPS",
   "type": "module",
   "bin": {
@@ -22,6 +22,7 @@
   "files": [
     "bin/",
     "dist/",
+    "skills/",
     "templates/"
   ],
   "keywords": [

@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { confirm, input } from '@inquirer/prompts';
-import { readFile, writeFile, mkdir, appendFile } from 'fs/promises';
+import { readFile, writeFile, mkdir, appendFile, cp, readdir } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
@@ -354,6 +354,35 @@ alias claude='IS_SANDBOX=1 claude --dangerously-skip-permissions'
   console.log(chalk.dim('  Run: source ~/.bashrc'));
 }
 
+// ─── Skills Installation ──────────────────────────────────────
+
+async function installSkills(): Promise<void> {
+  const __filename = fileURLToPath(import.meta.url);
+  const packageRoot = join(dirname(__filename), '..', '..');
+  const skillsSrc = join(packageRoot, 'skills');
+  const skillsDest = join(homedir(), '.claude', 'skills');
+
+  let skillNames: string[];
+  try {
+    const entries = await readdir(skillsSrc, { withFileTypes: true });
+    skillNames = entries.filter(e => e.isDirectory()).map(e => e.name);
+  } catch {
+    console.log(chalk.yellow('  No bundled skills found in package'));
+    return;
+  }
+
+  if (skillNames.length === 0) return;
+
+  await mkdir(skillsDest, { recursive: true });
+
+  for (const name of skillNames) {
+    const src = join(skillsSrc, name);
+    const dest = join(skillsDest, name);
+    await cp(src, dest, { recursive: true, force: true });
+    console.log(chalk.dim(`  ✓ ${name}`));
+  }
+}
+
 // ─── Main Setup Wizard ────────────────────────────────────────
 
 export async function setup(options: SetupOptions): Promise<void> {
@@ -556,6 +585,17 @@ export async function setup(options: SetupOptions): Promise<void> {
     console.log(chalk.green('✓ Aliases added'));
   } else {
     skip('aliases');
+  }
+
+  // ── Step 8: Claude Code Skills ─────────────────────────
+  stepHeader(8, 'Claude Code Skills');
+
+  const skillsSpinner = ora('Installing bundled skills to ~/.claude/skills/...').start();
+  try {
+    await installSkills();
+    skillsSpinner.succeed('Skills installed');
+  } catch (err) {
+    skillsSpinner.fail(chalk.red(`Skills install failed: ${(err as Error).message}`));
   }
 
   // ── Summary: verify & auto-fix ──────────────────────────
