@@ -56,12 +56,12 @@ async function aptUpdate(): Promise<void> {
 
 async function ensureBrewWrapper(): Promise<void> {
   const wrapperPath = '/usr/local/bin/brew';
-  const wrapper = '#!/bin/bash\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"';
+  const wrapper = '#!/bin/bash\ncd /tmp\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"';
 
   let needsWrite = true;
   try {
     const existing = await readFile(wrapperPath, 'utf8');
-    if (existing.includes('sudo -u linuxbrew')) needsWrite = false;
+    if (existing.includes('sudo -u linuxbrew') && existing.includes('cd /tmp')) needsWrite = false;
   } catch {}
 
   if (needsWrite) {
@@ -69,9 +69,10 @@ async function ensureBrewWrapper(): Promise<void> {
     console.log(chalk.dim('  root-safe brew wrapper created at /usr/local/bin/brew'));
   }
 
-  // Ensure /usr/local/bin is first in PATH so the wrapper takes precedence
-  // over the real brew binary added by `brew shellenv`
-  if (!process.env.PATH?.startsWith('/usr/local/bin')) {
+  const brewBin = '/home/linuxbrew/.linuxbrew/bin';
+  if (!process.env.PATH?.includes(brewBin)) {
+    process.env.PATH = `/usr/local/bin:${brewBin}:${process.env.PATH}`;
+  } else if (!process.env.PATH?.startsWith('/usr/local/bin')) {
     process.env.PATH = `/usr/local/bin:${process.env.PATH}`;
   }
 
@@ -92,11 +93,27 @@ async function ensureBrewWrapper(): Promise<void> {
   }
 }
 
+async function symlinkBrewBinaries(): Promise<void> {
+  const brewBin = '/home/linuxbrew/.linuxbrew/bin';
+  try {
+    const entries = await readdir(brewBin);
+    for (const name of entries) {
+      if (name === 'brew') continue;
+      const target = join('/usr/local/bin', name);
+      const source = join(brewBin, name);
+      try {
+        await runSafe('ln', ['-sf', source, target]);
+      } catch {}
+    }
+  } catch {}
+}
+
 async function installHomebrew(): Promise<void> {
   const existing = await commandExists('brew');
   if (existing) {
     console.log(chalk.dim('  brew already installed'));
     await ensureBrewWrapper();
+    await symlinkBrewBinaries();
     return;
   }
 
@@ -113,6 +130,7 @@ async function installHomebrew(): Promise<void> {
   }
 
   await ensureBrewWrapper();
+  await symlinkBrewBinaries();
   console.log(chalk.dim('  root-safe brew wrapper configured'));
 }
 

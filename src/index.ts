@@ -21,8 +21,8 @@ export async function main(): Promise<void> {
   const program = new Command();
 
   program
-    .name('openclaw-vps')
-    .description(chalk.cyan('🦞 OpenClaw VPS setup tool'))
+    .name('openclawpro')
+    .description(chalk.cyan('🦞 OpenClaw Pro'))
     .version(version);
 
   // ── setup ────────────────────────────────────────────────
@@ -87,6 +87,19 @@ export async function main(): Promise<void> {
       await addSecurity();
     });
 
+  // ── install ─────────────────────────────────────────────
+  const install = program
+    .command('install')
+    .description('Install components');
+
+  install
+    .command('skills')
+    .description('Install or update Claude Code skills to ~/.claude/skills/')
+    .action(async () => {
+      const { installSkills } = await import('./commands/install-skills.js');
+      await installSkills();
+    });
+
   // ── status ───────────────────────────────────────────────
   program
     .command('status')
@@ -99,7 +112,7 @@ export async function main(): Promise<void> {
   // ── Error handling ───────────────────────────────────────
   program.on('command:*', (operands: string[]) => {
     console.error(chalk.red(`Unknown command: ${operands.join(' ')}`));
-    console.log(chalk.dim('Run: openclaw-vps --help'));
+    console.log(chalk.dim('Run: openclawpro --help'));
     process.exit(1);
   });
 

@@ -4,110 +4,115 @@ Real-time Gmail monitoring with AI-powered notifications via Telegram/Discord.
 
 ## How It Works
 
-Gmail Pub/Sub pushes new emails to a local watcher service. The watcher forwards them to the OpenClaw gateway, which processes them with an AI agent and sends a summary to the configured channel (Telegram, Discord, etc.).
-
 ```
-Gmail --> Google Pub/Sub --> gmail-watch service --> OpenClaw Gateway --> Telegram/Discord
+Gmail -> Google Pub/Sub -> gog watch service -> OpenClaw Gateway -> Telegram/Discord
 ```
 
-## Prerequisites
+## Requirements
 
-- Google Cloud project with billing enabled
-- `gcloud` CLI installed
-- `gog` (Gmail OAuth helper) installed via Homebrew
+- Google OAuth **client_id** + **client_secret** (Desktop App type)
+- Gmail address to monitor
+- GCP project with billing enabled
+- `gcloud` and `gog` installed
+
+If the user doesn't have OAuth credentials:
+1. `https://console.cloud.google.com/apis/credentials`
+2. Create Credentials -> OAuth client ID -> Desktop app -> Create
+3. Copy client_id and client_secret
 
 ## Step-by-Step
 
-### 1. Install gcloud
+### 1. Install gog
 
 ```bash
-curl https://sdk.cloud.google.com | bash -s -- --disable-prompts
-ln -sf ~/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud
+which gog || (brew install gogcli && ln -sf /home/linuxbrew/.linuxbrew/bin/gog /usr/local/bin/gog)
 ```
 
-### 2. Authenticate gcloud (headless VPS)
-
-On a headless server, use the two-machine flow:
-
-```bash
-gcloud auth login --no-browser
-```
-
-This outputs a `gcloud auth login --remote-bootstrap="https://accounts.google.com/..."` command.
-
-**The user must run that exact command on their LOCAL machine** (where they have a browser and gcloud installed). Do NOT open the URL in a browser - run the full command in a local terminal.
-
-The local gcloud opens a browser for Google login, then outputs a URL starting with `https://localhost:...`. Copy that full URL and paste it back into the VPS terminal.
-
-Then set the project:
-
-```bash
-gcloud auth list
-gcloud config set project <PROJECT_ID>
-```
-
-### 3. Enable APIs
-
-```bash
-PROJECT_ID=$(gcloud config get project)
-gcloud services enable gmail.googleapis.com --project $PROJECT_ID
-gcloud services enable pubsub.googleapis.com --project $PROJECT_ID
-```
-
-### 4. Create OAuth Desktop App Credentials
-
-gog needs its own OAuth Desktop App credentials (separate from gcloud):
-
-1. Open `https://console.cloud.google.com/apis/credentials?project=<PROJECT_ID>`
-2. Click **"+ CREATE CREDENTIALS"** -> **"OAuth client ID"**
-3. If prompted for consent screen: select **External**, fill app name, support email, save
-4. Application type: **Desktop app**
-5. Click **Create** -> **Download JSON**
-6. Upload to VPS:
+### 2. Write OAuth credentials
 
 ```bash
 mkdir -p ~/.config/gogcli
-scp ~/Downloads/client_secret_*.json user@VPS:~/.config/gogcli/google-oauth-client.json
+cat > ~/.config/gogcli/google-oauth-client.json << 'EOF'
+{
+  "installed": {
+    "client_id": "<CLIENT_ID>",
+    "client_secret": "<CLIENT_SECRET>",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "redirect_uris": ["http://localhost"]
+  }
+}
+EOF
 ```
 
-### 5. Authenticate gog
+### 3. Set up gog keyring and credentials
 
 ```bash
 export GOG_KEYRING_PASSWORD=$(openssl rand -hex 16)
-echo "GOG_KEYRING_PASSWORD=$GOG_KEYRING_PASSWORD"  # Save this!
-
+echo "Save this: $GOG_KEYRING_PASSWORD"
 gog auth credentials set ~/.config/gogcli/google-oauth-client.json
+```
+
+### 4. Authenticate Gmail account
+
+```bash
 gog auth add <EMAIL> --manual --force-consent
 ```
 
-The `--manual` flag shows a URL. Open it in a browser, authorize, then get redirected to `localhost:...?code=...`. Paste the FULL redirect URL back (even though localhost doesn't load - the URL contains the auth code).
+Shows a URL -> user opens in browser -> authorizes -> gets redirected to `localhost:...?code=...` -> paste the FULL redirect URL back.
 
-Verify:
+Verify: `gog gmail search "in:inbox" --account <EMAIL> --limit 1`
 
-```bash
-gog gmail search "in:inbox" --account <EMAIL> --limit 1
-```
-
-### 6. Run the CLI
+### 5. Enable APIs
 
 ```bash
-npx openclaw-vps add gmail -e <EMAIL> --channel telegram --target <TELEGRAM_CHAT_ID>
+gcloud services enable gmail.googleapis.com pubsub.googleapis.com --project <PROJECT_ID>
 ```
 
-The CLI creates:
-- A Pub/Sub topic + push subscription
-- A `gmail-watch-<name>.service` systemd unit
-- Gateway hook configuration
+### 6. Run openclaw gmail setup
+
+```bash
+openclaw webhooks gmail setup \
+  --account <EMAIL> \
+  --project <PROJECT_ID> \
+  --port <PORT> \
+  --push-endpoint "https://<HOOKS_DOMAIN>/<HOOK_NAME>/gmail-pubsub?token=<PUSH_TOKEN>" \
+  --hook-url "http://127.0.0.1:18789/hooks/<HOOK_NAME>" \
+  --hook-token <HOOK_TOKEN> \
+  --tailscale off --include-body --max-bytes 20000
+```
+
+### 7. Create systemd service
+
+```bash
+cat > /etc/systemd/system/gmail-watch-<NAME>.service << EOF
+[Unit]
+Description=Gmail Watch (<EMAIL>)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env HOME=/root XDG_CONFIG_HOME=/root/.config GOG_KEYRING_PASSWORD=<KEYRING_PW> /usr/bin/openclaw webhooks gmail run --account <EMAIL> --bind 127.0.0.1 --port <PORT> --path /gmail-pubsub --label INBOX --topic projects/<PROJECT_ID>/topics/gog-gmail-watch-<NAME> --subscription gog-gmail-watch-push-<NAME> --push-token <PUSH_TOKEN> --hook-url http://127.0.0.1:18789/hooks/gmail-<NAME> --hook-token <HOOK_TOKEN> --include-body --max-bytes 20000 --tailscale off
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now gmail-watch-<NAME>
+```
 
 ## Troubleshooting
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `Error 400: invalid_request` / `GeneralOAuthFlow` | Opened URL in browser instead of running command locally | Run the full `gcloud auth login --remote-bootstrap=...` in a LOCAL terminal |
-| `gcloud not found` on local machine | gcloud not installed locally | Install: https://cloud.google.com/sdk/docs/install |
-| gcloud version mismatch | Local gcloud too old | `gcloud components update` locally |
-| `redirect_uri_mismatch` on gog | OAuth credentials are "Web app" type | Delete and recreate as "Desktop app" in GCP console |
-| `PERMISSION_DENIED` on Pub/Sub | APIs not enabled | `gcloud services enable gmail.googleapis.com pubsub.googleapis.com` |
-| `invalid_grant` on gog | Token expired or revoked | `gog auth add <EMAIL> --manual --force-consent` |
-| `Running Homebrew as root` | brew called as root | Create wrapper: `printf '#!/bin/bash\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"' > /usr/local/bin/brew && chmod +x /usr/local/bin/brew` |
-| Service crash loop | Various | `journalctl -u gmail-watch-<name> -n 30 --no-pager` |
+| Error | Fix |
+|-------|-----|
+| `gog: command not found` | `brew install gogcli && ln -sf /home/linuxbrew/.linuxbrew/bin/gog /usr/local/bin/gog` |
+| `Running Homebrew as root` | Fix wrapper: `printf '#!/bin/bash\ncd /tmp\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"' > /usr/local/bin/brew && chmod +x /usr/local/bin/brew` |
+| `redirect_uri_mismatch` | OAuth credentials must be "Desktop app" type, not "Web app" |
+| `PERMISSION_DENIED` on Pub/Sub | `gcloud services enable gmail.googleapis.com pubsub.googleapis.com` |
+| `invalid_grant` | `gog auth add <EMAIL> --manual --force-consent` |
+| `Error 400` on gcloud auth | Run `--remote-bootstrap` command in LOCAL terminal, don't open URL in browser |
+| Service crash loop | `journalctl -u gmail-watch-<NAME> -n 30 --no-pager` |

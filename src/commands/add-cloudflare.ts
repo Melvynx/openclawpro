@@ -59,8 +59,8 @@ export async function addCloudflare(_options: Record<string, unknown> = {}): Pro
   // ── Get tunnel token ──────────────────────────────────────
   console.log(chalk.bold('\nTunnel Configuration'));
   console.log(chalk.dim('You need a Cloudflare Tunnel token. Create one at:'));
-  console.log(chalk.cyan('  https://dash.cloudflare.com/ → Zero Trust → Networks → Tunnels'));
-  console.log(chalk.dim('Click "Create a tunnel" → Cloudflared → select Debian 64-bit → copy the token from the run command.\n'));
+  console.log(chalk.cyan('  https://dash.cloudflare.com/ > Networks > Connectors'));
+  console.log(chalk.dim('Click "Add a connector" > Cloudflared > select Debian 64-bit > copy the token from the run command.\n'));
 
   let tunnelToken = await input({
     message: 'Cloudflare Tunnel token:',
@@ -69,8 +69,8 @@ export async function addCloudflare(_options: Record<string, unknown> = {}): Pro
 
   // ── Hooks domain ──────────────────────────────────────────
   console.log(chalk.bold('\nPublic Hostname'));
-  console.log(chalk.dim('This domain will route external traffic to your hooks proxy.'));
-  console.log(chalk.dim('Example: hooks.yourdomain.com\n'));
+  console.log(chalk.dim('Choose a subdomain on a domain managed by Cloudflare (e.g. testclaw.mlvcdn.com).'));
+  console.log(chalk.dim('This will route external traffic (webhooks, Gmail push, etc.) to the hooks proxy on this VPS.\n'));
 
   const existingDomain = await getCliConfigValue('hooksDomain');
   let hooksDomain = await input({
@@ -141,15 +141,20 @@ export async function addCloudflare(_options: Record<string, unknown> = {}): Pro
   }
 
   // ── Instructions for public hostname ──────────────────────
-  console.log('\n' + chalk.bold.yellow('⚠  Add public hostname in Cloudflare dashboard:'));
+  const subdomain = hooksDomain.split('.')[0];
+  const domain = hooksDomain.split('.').slice(1).join('.');
+
+  console.log('\n' + chalk.bold.yellow('⚠  Add a public hostname route in Cloudflare dashboard:'));
   console.log(chalk.white(`
-  1. Go to: https://dash.cloudflare.com/ → Zero Trust → Networks → Tunnels
-  2. Click on your tunnel → "Public Hostname" tab
-  3. Add hostname:
-     - Subdomain: ${chalk.bold(hooksDomain.split('.')[0])}
-     - Domain: ${chalk.bold(hooksDomain.split('.').slice(1).join('.'))}
-     - Service URL: ${chalk.bold.cyan('http://localhost:18800')}
-  4. Save
+  1. Go to: https://dash.cloudflare.com/ > Networks > Connectors
+  2. Click on your connector > "Routes" tab
+  3. Click "Add a route" > "Public hostname"
+  4. Fill in:
+     - Subdomain: ${chalk.bold(subdomain)}
+     - Domain: ${chalk.bold(domain)}
+     - Service type: ${chalk.bold('HTTP')}
+     - Service URL: ${chalk.bold.cyan('localhost:18800')}
+  5. Save
 `));
 
   console.log(chalk.bold.green('✅ Cloudflare tunnel configured!'));

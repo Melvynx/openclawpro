@@ -1,8 +1,3 @@
----
-name: setup-cloudflare-dashboard
-description: Expose the OpenClaw Control UI (dashboard) on a public subdomain via Cloudflare Tunnel. Automates tunnel ingress, DNS CNAME, gateway controlUi config, and device pairing. Use when the user asks to expose the OpenClaw dashboard, setup dashboard access, add a Cloudflare route for the control UI, or make the gateway UI public.
----
-
 # Setup Cloudflare Dashboard
 
 Expose the OpenClaw Gateway Control UI on a public `<subdomain>.mlvcdn.com` domain via an existing Cloudflare Tunnel.
@@ -13,9 +8,9 @@ Gather before starting:
 
 | Item | How to get it |
 |------|---------------|
-| Cloudflare Account API Token | `https://dash.cloudflare.com/<account>/api-tokens` — needs **Cloudflare Tunnel: Edit** + **DNS: Edit** on the target zone |
-| Account ID | Decode the tunnel JWT in the `cloudflared.service`, field `a` |
-| Tunnel ID | Same JWT, field `t` — or `cloudflared tunnel list` |
+| Cloudflare Account API Token | `https://dash.cloudflare.com/<account>/api-tokens` - needs **Cloudflare Tunnel: Edit** + **DNS: Edit** on the target zone |
+| Account ID | Decode the connector JWT in `cloudflared.service`, field `a` - or Cloudflare dashboard (Networks > Connectors) |
+| Tunnel ID | Same JWT, field `t` - or `cloudflared tunnel list` - or Cloudflare dashboard (Networks > Connectors) |
 | Zone ID for `mlvcdn.com` | `1d990501fe37b96d5abe4df7688e622d` (known) |
 | Gateway dashboard port | Default `18789` — confirm with `openclaw gateway status` |
 | Desired subdomain | e.g. `openclawpro-dash` → `openclawpro-dash.mlvcdn.com` |

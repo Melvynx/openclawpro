@@ -5,95 +5,49 @@ Expose OpenClaw services on public subdomains via Cloudflare Tunnel without open
 ## How It Works
 
 ```
-Internet --> Cloudflare Edge --> cloudflared tunnel --> localhost:<port>
+Internet -> Cloudflare Edge -> cloudflared tunnel -> localhost:<port>
 ```
 
-Cloudflare Tunnel creates an outbound-only connection from the VPS to Cloudflare's edge. No inbound ports needed. Each service gets a subdomain routed through the tunnel's ingress config.
+Cloudflare Tunnel creates an outbound-only connection from the VPS to Cloudflare's edge. No inbound ports needed.
 
-## Initial Tunnel Setup
+## Setup
+
+### 1. Install cloudflared
 
 ```bash
-npx openclaw-vps add cloudflare
+apt install -y cloudflared
 ```
 
-This creates the tunnel, installs `cloudflared` as a systemd service, and configures DNS.
+Or direct download:
+```bash
+curl -L -o /usr/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+chmod +x /usr/bin/cloudflared
+```
 
-## Exposing a New Service
+### 2. Create a connector in Cloudflare Dashboard
 
-To add a new subdomain route (e.g., expose the OpenClaw dashboard):
+Go to **Networks > Connectors** in the Cloudflare dashboard. Click "Add a connector" > Cloudflared > select Debian 64-bit > copy the token.
 
-### 1. Get API credentials
-
-| Item | How to get it |
-|------|---------------|
-| Cloudflare API Token | `https://dash.cloudflare.com/<account>/api-tokens` - needs **Cloudflare Tunnel: Edit** + **DNS: Edit** |
-| Account ID | From tunnel JWT or Cloudflare dashboard |
-| Tunnel ID | `cloudflared tunnel list` or from the JWT |
-| Zone ID | Cloudflare dashboard -> domain -> Overview -> right sidebar |
-
-### 2. Get current tunnel config
+### 3. Install as systemd service
 
 ```bash
-CF_TOKEN="<api-token>"
-ACCOUNT_ID="<account-id>"
-TUNNEL_ID="<tunnel-id>"
-
-curl -s "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/cfd_tunnel/$TUNNEL_ID/configurations" \
-  -H "Authorization: Bearer $CF_TOKEN"
+cloudflared service install <TOKEN>
 ```
 
-### 3. Add ingress rule
+### 4. Add a public hostname route
 
-PUT the full config with the new rule prepended before the catch-all:
+In the Cloudflare dashboard: **Networks > Connectors** > click your connector > **Routes** tab > "Add a route" > "Public hostname":
 
-```bash
-SUBDOMAIN="my-service"
-DOMAIN="example.com"
-
-curl -s -X PUT \
-  "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/cfd_tunnel/$TUNNEL_ID/configurations" \
-  -H "Authorization: Bearer $CF_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "config": {
-      "ingress": [
-        ... existing rules ...,
-        {"hostname": "'$SUBDOMAIN'.'$DOMAIN'", "service": "http://localhost:<PORT>"},
-        {"service": "http_status:404"}
-      ]
-    }
-  }'
-```
-
-The catch-all `http_status:404` must always be the last rule.
-
-### 4. Create DNS CNAME
-
-```bash
-ZONE_ID="<zone-id>"
-
-curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-  -H "Authorization: Bearer $CF_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "CNAME",
-    "name": "'$SUBDOMAIN'",
-    "content": "'$TUNNEL_ID'.cfargotunnel.com",
-    "proxied": true
-  }'
-```
-
-### 5. Verify
-
-```bash
-curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$SUBDOMAIN.$DOMAIN/"
-```
+- **Subdomain**: e.g. `testclaw`
+- **Domain**: e.g. `mlvcdn.com`
+- **Service type**: HTTP
+- **Service URL**: `localhost:<PORT>` (e.g. `localhost:18800` for hooks proxy)
 
 ## Exposing the OpenClaw Dashboard
 
 The gateway Control UI runs on port `18789` by default.
 
-After adding the tunnel route (steps above), configure the gateway:
+After adding the route (subdomain -> `localhost:18789`), configure the gateway:
 
 Edit `~/.openclaw/openclaw.json`:
 
@@ -108,25 +62,42 @@ Edit `~/.openclaw/openclaw.json`:
 }
 ```
 
-- `allowedOrigins` - required for non-localhost access
-- `allowInsecureAuth` - needed because Cloudflare terminates TLS but forwards HTTP to the tunnel
-
 Restart the gateway:
 
 ```bash
 systemctl restart openclaw-gateway
 ```
 
-On first connection from a new device, approve pairing:
+Approve device pairing on first connection:
 
 ```bash
 openclaw devices list
 openclaw devices approve <requestId>
 ```
 
-Access via: `https://<subdomain>.<domain>/#token=<gateway-auth-token>`
+Access: `https://<subdomain>.<domain>/#token=<gateway-auth-token>`
 
-The token is per-tab (stored in `sessionStorage`).
+## API Management (alternative to dashboard UI)
+
+If you have a Cloudflare API token, you can manage routes programmatically:
+
+```bash
+CF_TOKEN="<api-token>"
+ACCOUNT_ID="<account-id>"
+TUNNEL_ID="<tunnel-id>"
+
+# Get current config
+curl -s "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/cfd_tunnel/$TUNNEL_ID/configurations" \
+  -H "Authorization: Bearer $CF_TOKEN"
+
+# Add ingress rule (PUT full config, new rule before catch-all)
+# Add DNS CNAME
+ZONE_ID="<zone-id>"
+curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+  -H "Authorization: Bearer $CF_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"CNAME","name":"<subdomain>","content":"<tunnel-id>.cfargotunnel.com","proxied":true}'
+```
 
 ## Troubleshooting
 

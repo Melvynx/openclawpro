@@ -1,16 +1,6 @@
 # Base VPS Setup
 
-## Full Automated Setup
-
-```bash
-npx openclaw-vps setup
-```
-
-The wizard handles everything: Node.js, openclaw, cloudflared, security hardening, and gateway service creation.
-
-## Manual Setup
-
-### Node.js (via nvm)
+## Node.js (via nvm)
 
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
@@ -24,32 +14,51 @@ Systemd can't find nvm-installed Node.js. Create a symlink:
 ln -sf "$(which node)" /usr/bin/node
 ```
 
-### OpenClaw + tools
+## OpenClaw + tools
 
 ```bash
 npm i -g openclaw api2cli
 openclaw configure
 ```
 
-### Cloudflared
+## Homebrew (for gog and other tools)
 
 ```bash
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list
+# Create linuxbrew user
+id -u linuxbrew &>/dev/null || useradd -m -s /bin/bash linuxbrew
+
+# Install brew
+sudo -u linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Create root-safe wrapper (required - brew refuses to run as root)
+printf '#!/bin/bash\ncd /tmp\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"' > /usr/local/bin/brew
+chmod +x /usr/local/bin/brew
+
+# Add brew to PATH in .bashrc
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+```
+
+After installing any brew package, symlink the binary so it's available everywhere:
+
+```bash
+ln -sf /home/linuxbrew/.linuxbrew/bin/<BINARY> /usr/local/bin/<BINARY>
+```
+
+## Cloudflared
+
+```bash
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | gpg --dearmor -o /etc/apt/keyrings/cloudflare-main.gpg
+echo "deb [signed-by=/etc/apt/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared bookworm main" > /etc/apt/sources.list.d/cloudflared.list
 apt update && apt install -y cloudflared
 ```
 
-### Security Hardening
+## Security Hardening
 
-```bash
-npx openclaw-vps add security
-```
-
-This configures:
-- **UFW** - Firewall allowing only SSH + Cloudflare IPs
-- **fail2ban** - Brute-force protection
-- **SSH** - Key-only auth, root password disabled
-- **unattended-upgrades** - Auto security patches
+- **UFW** - `apt install -y ufw && ufw allow ssh && ufw --force enable`
+- **fail2ban** - `apt install -y fail2ban && systemctl enable --now fail2ban`
+- **SSH** - Disable password auth: `sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && systemctl restart sshd`
+- **unattended-upgrades** - `apt install -y unattended-upgrades && dpkg-reconfigure -plow unattended-upgrades`
 
 ## Key Paths
 

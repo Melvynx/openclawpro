@@ -4,7 +4,8 @@
   "description": "One-command setup for OpenClaw on a VPS",
   "type": "module",
   "bin": {
-    "openclaw-vps": "./bin/openclaw-vps.js"
+    "openclawpro": "./bin/openclawpro.js",
+    "openclaw-vps": "./bin/openclawpro.js"
   },
   "scripts": {
     "build": "tsc",
