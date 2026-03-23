@@ -1,13 +1,25 @@
 [Unit]
-Description=Gmail Watch ({{EMAIL}})
+Description=GOG Gmail Watch Serve ({{EMAIL}})
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/env HOME=/root XDG_CONFIG_HOME=/root/.config GOG_KEYRING_PASSWORD={{GOG_KEYRING_PASSWORD}} /usr/bin/openclaw webhooks gmail run --account {{EMAIL}} --bind 127.0.0.1 --port {{PORT}} --path /gmail-pubsub --label INBOX --topic {{TOPIC}} --subscription {{SUBSCRIPTION}} --push-token {{PUSH_TOKEN}} --hook-url {{HOOK_URL}} --hook-token {{HOOK_TOKEN}} --include-body --max-bytes 20000 --tailscale off
+ExecStart=/home/linuxbrew/.linuxbrew/bin/gog gmail watch serve \
+  --account {{EMAIL}} \
+  --bind 127.0.0.1 \
+  --port {{PORT}} \
+  --path /gmail-pubsub \
+  --token {{PUSH_TOKEN}} \
+  --hook-url {{HOOK_URL}} \
+  --hook-token {{HOOK_TOKEN}} \
+  --include-body \
+  --max-bytes 20000
 Restart=always
 RestartSec=5
+Environment=HOME=/root
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+Environment=GOG_KEYRING_PASSWORD={{GOG_KEYRING_PASSWORD}}
 
 [Install]
 WantedBy=multi-user.target

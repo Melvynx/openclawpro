@@ -40,13 +40,19 @@ openclaw doctor                      # Check health
 systemctl status openclaw-gateway    # Gateway service
 npx openclawpro install skills       # Install/update Claude Code skills
 
-# Gmail watchers
-systemctl list-units --type=service | grep gmail-watch  # List all watchers
-systemctl restart gmail-watch-<label>                    # Restart a watcher
-journalctl -u gmail-watch-<label> -f                    # Follow logs
+# Gmail watchers (use gog directly, NOT openclaw webhooks)
+systemctl list-units --type=service | grep gog-gmail     # List all watchers
+systemctl restart gog-gmail-<label>                      # Restart a watcher
+journalctl -u gog-gmail-<label> -f                      # Follow logs
 ```
 
 ## Gmail Setup
 
-DO NOT use `openclaw webhooks gmail setup` - it is unreliable.
-Instead, load `references/setup-gmail.md` which has the working one-shot procedure using direct `gcloud` commands for Pub/Sub topic/subscription creation and IAM binding.
+DO NOT use `openclaw webhooks gmail setup` or `openclaw webhooks gmail run` - they are unreliable.
+Instead, load `references/setup-gmail.md` which uses `gog gmail watch serve` directly with `gcloud` commands for Pub/Sub setup.
+
+Key facts:
+- Use `gog gmail watch serve` (NOT `openclaw webhooks gmail run`)
+- `deliver: true` is MANDATORY in hook mappings
+- `gmail-api-push@system.gserviceaccount.com` IAM binding is CRITICAL
+- Service naming: `gog-gmail-<label>.service`

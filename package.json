@@ -24,7 +24,8 @@
     "bin/",
     "dist/",
     "skills/",
-    "templates/"
+    "templates/",
+    "openclaw-config/"
   ],
   "keywords": [
     "openclaw",

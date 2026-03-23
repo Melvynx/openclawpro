@@ -9,7 +9,7 @@ Email arrives in Gmail
     -> Gmail API pushes to Google Pub/Sub topic
     -> Pub/Sub push subscription sends HTTPS POST
     -> Cloudflare Tunnel routes to VPS (gmail-<label>.<domain> -> localhost:<port>)
-    -> gog watcher (openclaw webhooks gmail run) receives notification
+    -> gog gmail watch serve (local HTTP server) receives notification
     -> Fetches email content via Gmail API
     -> POSTs to OpenClaw Gateway (/hooks/gmail-<label>)
     -> AI agent filters (spam vs important)
@@ -38,7 +38,7 @@ Each Gmail account gets:
 - Its own **Pub/Sub push subscription** (`gog-gmail-watch-<label>-push`)
 - Its own **Cloudflare subdomain** (`gmail-<label>.<domain>`)
 - Its own **local port** (8788, 8789, 8790, ...)
-- Its own **systemd service** (`gmail-watch-<label>`)
+- Its own **systemd service** (`gog-gmail-<label>`)
 - Its own **hook mapping** in openclaw.json (`gmail-<label>`)
 
 ## Key Components
@@ -47,7 +47,7 @@ Each Gmail account gets:
 |-----------|---------|
 | `gog` CLI | Gmail OAuth + API client (installed via brew) |
 | `gcloud` CLI | Creates Pub/Sub topics/subscriptions |
-| `openclaw webhooks gmail run` | Watcher that receives push notifications and fetches email content |
+| `gog gmail watch serve` | Long-running HTTP server that receives push notifications, fetches email content, and auto-renews Gmail watch |
 | Cloudflare Tunnel | Routes HTTPS traffic to local ports without opening firewall |
 | openclaw.json `hooks.mappings` | AI filtering rules per email account |
 
@@ -59,13 +59,13 @@ See `references/setup-gmail.md` for the complete one-shot setup procedure.
 
 ```bash
 # Check all gmail watchers
-systemctl list-units --type=service | grep gmail-watch
+systemctl list-units --type=service | grep gog-gmail
 
 # Restart a watcher
-systemctl restart gmail-watch-<label>
+systemctl restart gog-gmail-<label>
 
 # Check logs
-journalctl -u gmail-watch-<label> -f
+journalctl -u gog-gmail-<label> -f
 
 # List gog authenticated accounts
 GOG_KEYRING_PASSWORD=<pw> gog auth list
@@ -93,4 +93,4 @@ gcloud pubsub subscriptions update gog-gmail-watch-<label>-push \
 | `invalid_grant` | Token expired: re-authenticate with `gog auth add <email> --client <client> --remote --step 1/2` |
 | `Error 400` on gcloud auth | Run `--remote-bootstrap` command in LOCAL terminal, don't open URL in browser |
 | Service crash loop | `journalctl -u gmail-watch-<label> -n 30 --no-pager` |
-| No notifications after 7 days | Gmail watch expired - restart service: `systemctl restart gmail-watch-<label>` (auto-renews) |
+| No notifications after 7 days | Gmail watch expired - restart service: `systemctl restart gog-gmail-<label>` (auto-renews) |
