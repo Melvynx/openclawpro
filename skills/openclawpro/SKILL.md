@@ -36,9 +36,17 @@ Load these as needed based on the user's request:
 ```bash
 openclaw gateway status              # Gateway status
 openclaw configure                   # Interactive config wizard
-openclaw webhooks gmail setup        # Setup Gmail watch
-openclaw webhooks gmail run          # Run Gmail watcher
 openclaw doctor                      # Check health
 systemctl status openclaw-gateway    # Gateway service
 npx openclawpro install skills       # Install/update Claude Code skills
+
+# Gmail watchers
+systemctl list-units --type=service | grep gmail-watch  # List all watchers
+systemctl restart gmail-watch-<label>                    # Restart a watcher
+journalctl -u gmail-watch-<label> -f                    # Follow logs
 ```
+
+## Gmail Setup
+
+DO NOT use `openclaw webhooks gmail setup` - it is unreliable.
+Instead, load `references/setup-gmail.md` which has the working one-shot procedure using direct `gcloud` commands for Pub/Sub topic/subscription creation and IAM binding.

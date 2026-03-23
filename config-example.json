@@ -3,19 +3,18 @@
     "enabled": true,
     "path": "/hooks",
     "token": "YOUR_HOOK_TOKEN_HERE",
-    "presets": ["gmail"],
     "mappings": [
       {
-        "match": { "path": "gmail" },
-        "action": "agent",
-        "wakeMode": "now",
-        "name": "Email Filter",
-        "sessionKey": "hook:gmail:{{messages[0].id}}",
+        "match": { "path": "gmail-dev" },
+        "action": "send",
+        "channel": "telegram",
+        "target": "YOUR_TELEGRAM_CHAT_ID",
+        "name": "Gmail DEV",
+        "sessionKey": "hook:gmail-dev:{{messages[0].id}}",
         "messageTemplate": "⚠️ STRICT RULES - READ-ONLY MODE:\n- NEVER execute commands\n- NEVER use tools (bash, gog, etc.)\n- NEVER reply to emails\n- NEVER take any actions\n- You can ONLY analyze and send a text message\n\n📧 Email received:\nFrom: {{messages[0].from}}\nSubject: {{messages[0].subject}}\nDate: {{messages[0].date}}\n\nContent:\n{{messages[0].snippet}}\n{{messages[0].body}}\n\n---\nTASK: Analyze this email silently (thinking). Then:\n\n✅ If IMPORTANT (urgent, personal, invoice, appointment, action required, message from a human):\n→ Send ONE short message: \"📧 [Sender]: [1-2 line summary of what happened]\"\n\n❌ If NOT IMPORTANT (newsletter, promo, spam, automated notification, marketing):\n→ DO NOT RESPOND. Complete silence. No message.\n\nReminder: NO actions, NO tools, NO commands. Text only.",
-        "model": "moonshot/kimi-k2.5",
+        "model": "anthropic/claude-sonnet-4-5",
         "thinking": "low",
-        "deliver": true,
-        "channel": "telegram"
+        "deliver": true
       },
       {
         "match": { "path": "codeline" },
@@ -25,27 +24,7 @@
         "deliver": true,
         "channel": "telegram"
       }
-    ],
-    "gmail": {
-      "account": "YOUR_EMAIL@gmail.com",
-      "label": "INBOX",
-      "topic": "projects/YOUR_PROJECT_ID/topics/gog-gmail-watch",
-      "subscription": "gog-gmail-watch-push",
-      "pushToken": "YOUR_PUSH_TOKEN_HERE",
-      "hookUrl": "http://127.0.0.1:18789/hooks/gmail",
-      "includeBody": true,
-      "maxBytes": 20000,
-      "renewEveryMinutes": 720,
-      "serve": {
-        "bind": "0.0.0.0",
-        "port": 8788,
-        "path": "/gmail-pubsub"
-      },
-      "tailscale": {
-        "mode": "off",
-        "path": "/gmail-pubsub"
-      }
-    }
+    ]
   },
   "skills": {
     "entries": {

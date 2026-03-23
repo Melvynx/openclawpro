@@ -131,35 +131,48 @@ cloudflared tunnel login
 # 1. Cloudflare Tunnel running?
 systemctl status cloudflared
 
-# 2. gog listening on port 8788?
-ss -tlnp | grep 8788
+# 2. Gmail watcher service running?
+systemctl status gmail-watch-<label>
 
-# 3. Gateway has gmail logs?
-journalctl --user -u openclaw-gateway | grep -i gmail
+# 3. Port listening?
+ss -tlnp | grep <port>
 
-# 4. Gmail watch active?
-gog gmail watch status --account your.email@gmail.com
+# 4. Gateway logs?
+journalctl -u openclaw-gateway | grep -i gmail
 
 # 5. Pub/Sub subscription endpoint correct?
-gcloud pubsub subscriptions describe gog-gmail-watch-push
+gcloud pubsub subscriptions describe gog-gmail-watch-<label>-push --project=<PROJECT_ID>
+
+# 6. IAM binding on topic?
+gcloud pubsub topics get-iam-policy projects/<PROJECT_ID>/topics/gog-gmail-watch-<label>
+# Must show: gmail-api-push@system.gserviceaccount.com -> roles/pubsub.publisher
+
+# 7. Cloudflare DNS resolves?
+dig gmail-<label>.<domain> +short
 ```
 
-**Fix bind address:** In `/root/.openclaw/openclaw.json`, ensure:
-```json
-"serve": {
-  "bind": "0.0.0.0",
-  "port": 8788
-}
+**Missing IAM binding (most common cause):**
+```bash
+gcloud pubsub topics add-iam-policy-binding \
+  projects/<PROJECT_ID>/topics/gog-gmail-watch-<label> \
+  --member="serviceAccount:gmail-api-push@system.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
 ```
 
 **Update push endpoint:**
 ```bash
-gcloud pubsub subscriptions update gog-gmail-watch-push \
-  --project YOUR_PROJECT_ID \
-  --push-endpoint "https://gmail.YOUR_DOMAIN.com/gmail-pubsub?token=YOUR_TOKEN"
+gcloud pubsub subscriptions update gog-gmail-watch-<label>-push \
+  --project <PROJECT_ID> \
+  --push-endpoint "https://gmail-<label>.<domain>/gmail-pubsub?token=<PUSH_TOKEN>"
 ```
 
-**"ignoring stale push" messages** are normal — they appear after restart when old notifications arrive.
+**Gmail watch expired (no notifications after 7 days):**
+```bash
+systemctl restart gmail-watch-<label>
+# The watcher auto-renews the watch on startup
+```
+
+**"ignoring stale push" messages** are normal - they appear after restart when old notifications arrive.
 
 ---
 
@@ -183,15 +196,20 @@ chmod -R 700 /root/.claude
 ### "OAuth credentials not configured"
 
 ```bash
-gog auth credentials set /root/.openclaw/gogcli/credentials.json
-gog auth add your.email@gmail.com --manual --force-consent
+# Write credentials file and register named client
+gog auth credentials set ~/.config/gogcli/credentials-<client>.json --name <client>
+
+# Re-authenticate (headless VPS - two-step)
+gog auth add <email> --client <client> --remote --step 1
+# -> Copy OAuth URL to local browser, authorize, copy redirect URL
+gog auth add <email> --client <client> --remote --step 2 --auth-url "<redirect-url>"
 ```
 
 ### gcloud not authenticated
 
 ```bash
 gcloud auth login --no-browser
-gcloud config set project YOUR_PROJECT_ID
+gcloud config set project <PROJECT_ID>
 ```
 
 ---

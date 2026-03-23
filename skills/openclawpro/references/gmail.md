@@ -5,104 +5,81 @@ Real-time Gmail monitoring with AI-powered notifications via Telegram/Discord.
 ## How It Works
 
 ```
-Gmail -> Google Pub/Sub -> gog watch service -> OpenClaw Gateway -> Telegram/Discord
+Email arrives in Gmail
+    -> Gmail API pushes to Google Pub/Sub topic
+    -> Pub/Sub push subscription sends HTTPS POST
+    -> Cloudflare Tunnel routes to VPS (gmail-<label>.<domain> -> localhost:<port>)
+    -> gog watcher (openclaw webhooks gmail run) receives notification
+    -> Fetches email content via Gmail API
+    -> POSTs to OpenClaw Gateway (/hooks/gmail-<label>)
+    -> AI agent filters (spam vs important)
+    -> Sends Telegram notification if important
 ```
 
 ## Requirements
 
 - Google OAuth **client_id** + **client_secret** (Desktop App type)
 - Gmail address to monitor
-- GCP project with billing enabled
-- `gcloud` and `gog` installed
+- GCP project with billing enabled + Gmail & Pub/Sub APIs enabled
+- `gcloud` CLI authenticated
+- `gog` CLI installed (via `brew install gogcli`)
+- Cloudflare Tunnel already running (token-based, dashboard-managed)
+- Cloudflare API token with DNS:Edit + Tunnel:Edit permissions
 
 If the user doesn't have OAuth credentials:
 1. `https://console.cloud.google.com/apis/credentials`
 2. Create Credentials -> OAuth client ID -> Desktop app -> Create
 3. Copy client_id and client_secret
 
+## Architecture Per Account
+
+Each Gmail account gets:
+- Its own **Pub/Sub topic** (`gog-gmail-watch-<label>`)
+- Its own **Pub/Sub push subscription** (`gog-gmail-watch-<label>-push`)
+- Its own **Cloudflare subdomain** (`gmail-<label>.<domain>`)
+- Its own **local port** (8788, 8789, 8790, ...)
+- Its own **systemd service** (`gmail-watch-<label>`)
+- Its own **hook mapping** in openclaw.json (`gmail-<label>`)
+
+## Key Components
+
+| Component | Purpose |
+|-----------|---------|
+| `gog` CLI | Gmail OAuth + API client (installed via brew) |
+| `gcloud` CLI | Creates Pub/Sub topics/subscriptions |
+| `openclaw webhooks gmail run` | Watcher that receives push notifications and fetches email content |
+| Cloudflare Tunnel | Routes HTTPS traffic to local ports without opening firewall |
+| openclaw.json `hooks.mappings` | AI filtering rules per email account |
+
 ## Step-by-Step
 
-### 1. Install gog
+See `references/setup-gmail.md` for the complete one-shot setup procedure.
+
+## Quick Commands
 
 ```bash
-which gog || (brew install gogcli && ln -sf /home/linuxbrew/.linuxbrew/bin/gog /usr/local/bin/gog)
-```
+# Check all gmail watchers
+systemctl list-units --type=service | grep gmail-watch
 
-### 2. Write OAuth credentials
+# Restart a watcher
+systemctl restart gmail-watch-<label>
 
-```bash
-mkdir -p ~/.config/gogcli
-cat > ~/.config/gogcli/google-oauth-client.json << 'EOF'
-{
-  "installed": {
-    "client_id": "<CLIENT_ID>",
-    "client_secret": "<CLIENT_SECRET>",
-    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "token_uri": "https://oauth2.googleapis.com/token",
-    "redirect_uris": ["http://localhost"]
-  }
-}
-EOF
-```
+# Check logs
+journalctl -u gmail-watch-<label> -f
 
-### 3. Set up gog keyring and credentials
+# List gog authenticated accounts
+GOG_KEYRING_PASSWORD=<pw> gog auth list
 
-```bash
-export GOG_KEYRING_PASSWORD=$(openssl rand -hex 16)
-echo "Save this: $GOG_KEYRING_PASSWORD"
-gog auth credentials set ~/.config/gogcli/google-oauth-client.json
-```
+# Verify gmail API access
+GOG_KEYRING_PASSWORD=<pw> gog gmail search "in:inbox" --account <email> --limit 1
 
-### 4. Authenticate Gmail account
+# Check pub/sub subscription endpoint
+gcloud pubsub subscriptions describe gog-gmail-watch-<label>-push --project=<project-id>
 
-```bash
-gog auth add <EMAIL> --manual --force-consent
-```
-
-Shows a URL -> user opens in browser -> authorizes -> gets redirected to `localhost:...?code=...` -> paste the FULL redirect URL back.
-
-Verify: `gog gmail search "in:inbox" --account <EMAIL> --limit 1`
-
-### 5. Enable APIs
-
-```bash
-gcloud services enable gmail.googleapis.com pubsub.googleapis.com --project <PROJECT_ID>
-```
-
-### 6. Run openclaw gmail setup
-
-```bash
-openclaw webhooks gmail setup \
-  --account <EMAIL> \
-  --project <PROJECT_ID> \
-  --port <PORT> \
-  --push-endpoint "https://<HOOKS_DOMAIN>/<HOOK_NAME>/gmail-pubsub?token=<PUSH_TOKEN>" \
-  --hook-url "http://127.0.0.1:18789/hooks/<HOOK_NAME>" \
-  --hook-token <HOOK_TOKEN> \
-  --tailscale off --include-body --max-bytes 20000
-```
-
-### 7. Create systemd service
-
-```bash
-cat > /etc/systemd/system/gmail-watch-<NAME>.service << EOF
-[Unit]
-Description=Gmail Watch (<EMAIL>)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/env HOME=/root XDG_CONFIG_HOME=/root/.config GOG_KEYRING_PASSWORD=<KEYRING_PW> /usr/bin/openclaw webhooks gmail run --account <EMAIL> --bind 127.0.0.1 --port <PORT> --path /gmail-pubsub --label INBOX --topic projects/<PROJECT_ID>/topics/gog-gmail-watch-<NAME> --subscription gog-gmail-watch-push-<NAME> --push-token <PUSH_TOKEN> --hook-url http://127.0.0.1:18789/hooks/gmail-<NAME> --hook-token <HOOK_TOKEN> --include-body --max-bytes 20000 --tailscale off
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable --now gmail-watch-<NAME>
+# Update pub/sub push endpoint
+gcloud pubsub subscriptions update gog-gmail-watch-<label>-push \
+  --project=<project-id> \
+  --push-endpoint="https://gmail-<label>.<domain>/gmail-pubsub?token=<push-token>"
 ```
 
 ## Troubleshooting
@@ -112,7 +89,8 @@ systemctl enable --now gmail-watch-<NAME>
 | `gog: command not found` | `brew install gogcli && ln -sf /home/linuxbrew/.linuxbrew/bin/gog /usr/local/bin/gog` |
 | `Running Homebrew as root` | Fix wrapper: `printf '#!/bin/bash\ncd /tmp\nexec sudo -u linuxbrew /home/linuxbrew/.linuxbrew/bin/brew "$@"' > /usr/local/bin/brew && chmod +x /usr/local/bin/brew` |
 | `redirect_uri_mismatch` | OAuth credentials must be "Desktop app" type, not "Web app" |
-| `PERMISSION_DENIED` on Pub/Sub | `gcloud services enable gmail.googleapis.com pubsub.googleapis.com` |
-| `invalid_grant` | `gog auth add <EMAIL> --manual --force-consent` |
+| `PERMISSION_DENIED` on Pub/Sub | Missing IAM binding: `gcloud pubsub topics add-iam-policy-binding ... --member="serviceAccount:gmail-api-push@system.gserviceaccount.com" --role="roles/pubsub.publisher"` |
+| `invalid_grant` | Token expired: re-authenticate with `gog auth add <email> --client <client> --remote --step 1/2` |
 | `Error 400` on gcloud auth | Run `--remote-bootstrap` command in LOCAL terminal, don't open URL in browser |
-| Service crash loop | `journalctl -u gmail-watch-<NAME> -n 30 --no-pager` |
+| Service crash loop | `journalctl -u gmail-watch-<label> -n 30 --no-pager` |
+| No notifications after 7 days | Gmail watch expired - restart service: `systemctl restart gmail-watch-<label>` (auto-renews) |
