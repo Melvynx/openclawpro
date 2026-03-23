@@ -49,7 +49,7 @@ jobs:
           if [ -z "$LAST_TAG" ]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
-            CHANGED_FILES=$(git diff --name-only $LAST_TAG HEAD -- src/ bin/ templates/ ':!package.json')
+            CHANGED_FILES=$(git diff --name-only $LAST_TAG HEAD -- src/ bin/ templates/ skills/ ':!package.json')
             echo "Changed files since $LAST_TAG:"
             echo "$CHANGED_FILES"
             if [ -n "$CHANGED_FILES" ]; then
